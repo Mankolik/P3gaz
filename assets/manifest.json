@@ -1,9 +1,40 @@
 {
   "geojson": [
     {
-      "id": "fir_sample",
-      "path": "./assets/geojson/sample_fir.geojson",
-      "layer": "FIR"
+      "id": "fir_europe",
+      "path": "./assets/geojson/flightmap_europe_fir_uir.json",
+      "layer": "FIR",
+      "type": "polygon"
+    },
+    {
+      "id": "sector_low",
+      "path": "./assets/geojson/epww_sectors_low.geojson",
+      "layer": "SECTOR_LOW",
+      "type": "polygon"
+    },
+    {
+      "id": "sector_high",
+      "path": "./assets/geojson/epww_sectors_high.geojson",
+      "layer": "SECTOR_HIGH",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_bundle",
+      "path": "./assets/geojson/epd_bundle.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "ctr_poland",
+      "path": "./assets/geojson/pl_ctrs.geojson",
+      "layer": "CTR",
+      "type": "polygon"
+    },
+    {
+      "id": "airports",
+      "path": "./assets/geojson/airports_static.json",
+      "layer": "AIRPORTS",
+      "type": "point"
     }
   ],
   "plugins": []
