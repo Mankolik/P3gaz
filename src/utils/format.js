@@ -1,0 +1,1 @@
+export function fmtAlt(ft){ return String(Math.round(ft)).padStart(3,'0'); }

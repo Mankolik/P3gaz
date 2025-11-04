@@ -1,0 +1,1 @@
+export function createUndo(){ return { push(){}, undo(){}, redo(){} }; }

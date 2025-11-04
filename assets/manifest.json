@@ -1,0 +1,10 @@
+{
+  "geojson": [
+    {
+      "id": "fir_sample",
+      "path": "./assets/geojson/sample_fir.geojson",
+      "layer": "FIR"
+    }
+  ],
+  "plugins": []
+}
