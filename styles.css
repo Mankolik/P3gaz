@@ -1,0 +1,31 @@
+:root{
+  --bg:#020609; --panel:#0d141b; --panel-2:#101a23; --stroke:#1f2a35;
+  --text:#cfe4ff; --text-dim:#96acc5; --ok:#2cb67d;
+}
+*{ box-sizing:border-box }
+html,body,#app{ height:100%; margin:0; background:var(--bg); color:var(--text); font:14px/1.25 system-ui, -apple-system, Segoe UI, Roboto }
+#app{ display:grid; grid-template-rows:48px 1fr auto }
+/* TOP BAR */
+header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--stroke) }
+.topgroup{ display:flex; align-items:center; gap:6px; padding:4px 6px; background:var(--panel-2); border:1px solid var(--stroke); border-radius:10px }
+.label{ color:var(--text-dim); font-size:12px }
+.dropdown,.info,.input{ height:30px; display:flex; align-items:center; gap:6px; padding:0 10px; border:1px solid var(--stroke); border-radius:8px; background:#0b1117; }
+.info{ cursor:default } .info .value{ font-weight:600 }
+.dropdown{ position:relative } .dropdown .value{ min-width:56px }
+.dropdown-panel{ position:absolute; top:36px; left:0; min-width:220px; background:var(--panel); border:1px solid var(--stroke); border-radius:10px; padding:8px; display:none; z-index:10; box-shadow:0 8px 24px rgba(0,0,0,.35) }
+.dropdown.open .dropdown-panel{ display:block }
+.dropdown-panel .option{ padding:6px 8px; border-radius:8px; cursor:pointer }
+.dropdown-panel .option:hover{ background:#18212b }
+.dropdown-panel .option.active{ background:#122030; border:1px solid #233242 }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+.input input{ width:64px; background:transparent; color:var(--text); border:none; outline:none; text-align:center }
+/* Text-button toggle */
+.textbtn{ height:30px; display:flex; align-items:center; gap:6px; padding:0 10px; border:1px solid var(--stroke); border-radius:8px; background:#0b1117; cursor:pointer; user-select:none }
+.textbtn.active{ background:#122030; border-color:#2c3d4f; box-shadow:0 0 0 1px #2c3d4f inset }
+/* CANVAS */
+#main{ position:relative } #radar{ width:100%; height:100%; display:block; background:#020609 }
+/* BOTTOM BAR */
+footer#bottombar{ background:var(--panel); border-top:1px solid var(--stroke); padding:8px }
+footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; border:1px solid var(--stroke); border-radius:999px }
+/* helpers */
+.kv{ display:flex; gap:6px; align-items:center } .k{ color:var(--text-dim) } .v{ font-weight:600 }
