@@ -1,4 +1,15 @@
-import { getVisibleLayers } from '../map/layers.js';
+import { getVisibleLayers } from './layers.js';
+
+const LAYER_STYLES = {
+  FIR: { stroke: '#6c757d' },
+  SECTOR_LOW: { stroke: '#2f9b46' },
+  SECTOR_HIGH: { stroke: '#7a1f3d' },
+  TMA: { stroke: '#22495e' }
+};
+
+function getStrokeColor(name){
+  return LAYER_STYLES[name]?.stroke || '#22495e';
+}
 
 export function drawFrame(canvas, camera, state){
   const {ctx} = canvas;
@@ -11,11 +22,12 @@ export function drawFrame(canvas, camera, state){
 
   for(const [name,layer] of getVisibleLayers(state)){
     if(layer.type==='polygon'){
-      ctx.lineWidth = 1; ctx.strokeStyle = '#22495e'; ctx.fillStyle = 'rgba(34,73,94,0.2)';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = getStrokeColor(name);
       for(const f of layer.features){ if(!f.xy) continue;
         ctx.beginPath();
         f.xy.forEach(([x,y],i)=> i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.closePath(); ctx.stroke();
       }
     }else if(layer.type==='point'){
       ctx.fillStyle = '#9ad1ff';

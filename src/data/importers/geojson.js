@@ -1,7 +1,34 @@
 // Very light normalizer. Expects WGS84 lon/lat.
 export function normalizeGeoJSON(geojson, project){
   const feats = [];
-  const proj = project || ((lon,lat)=> [lon*10000, -lat*10000]); // fast equirect to XY (placeholder)
+  let proj = project;
+  if(!proj){
+    let latSum = 0; let count = 0;
+    for(const g of (geojson.features||[])){
+      const geom = g?.geometry;
+      if(!geom) continue;
+      if(geom.type==='Polygon'){
+        for(const ring of geom.coordinates||[]){
+          for(const coord of ring||[]){ if(coord?.length>1){ latSum += coord[1]; count++; } }
+        }
+      } else if(geom.type==='MultiPolygon'){
+        for(const poly of geom.coordinates||[]){
+          for(const ring of poly||[]){
+            for(const coord of ring||[]){ if(coord?.length>1){ latSum += coord[1]; count++; } }
+          }
+        }
+      } else if(geom.type==='Point'){
+        const coord = geom.coordinates;
+        if(Array.isArray(coord) && coord.length>1){ latSum += coord[1]; count++; }
+      } else if(geom.type==='MultiPoint'){
+        for(const coord of geom.coordinates||[]){ if(coord?.length>1){ latSum += coord[1]; count++; } }
+      }
+    }
+    const meanLat = count ? latSum / count : 0;
+    const lonScale = Math.cos(meanLat * Math.PI / 180) || 1;
+    const factor = 10000;
+    proj = (lon,lat)=> [lon*lonScale*factor, -lat*factor];
+  }
   const pushPolygon = (coords, props)=>{
     if(!Array.isArray(coords) || !coords.length) return;
     const ring = coords[0].map(([lon,lat])=>proj(lon,lat));

@@ -1,5 +1,3 @@
-import { registerLayer, addFeatures } from '../render/layers.js';
-
 export function fitAll(state, camera, container){
   const pts=[];
   for(const L of state.map.layers.values()){
@@ -9,11 +7,32 @@ export function fitAll(state, camera, container){
     }
   }
   if(!pts.length) return;
-  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
-  const minX=Math.min(...xs), maxX=Math.max(...xs);
-  const minY=Math.min(...ys), maxY=Math.max(...ys);
-  const pad=40; const w=container.clientWidth||800; const h=container.clientHeight||600;
-  const scaleX=(w-pad*2)/(maxX-minX); const scaleY=(h-pad*2)/(maxY-minY);
+  const bounds = boundsFromPoints(pts);
+  fitBounds(camera, container, bounds);
+}
+
+export function fitBounds(camera, container, bounds, pad=40){
+  if(!bounds) return;
+  const {minX, maxX, minY, maxY} = bounds;
+  if(!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) return;
+  const w=container.clientWidth||800; const h=container.clientHeight||600;
+  const width=Math.max(1e-3, maxX-minX);
+  const height=Math.max(1e-3, maxY-minY);
+  const scaleX=(w-pad*2)/width;
+  const scaleY=(h-pad*2)/height;
   const z=Math.max(0.1, Math.min(scaleX, scaleY));
-  camera.z=z; camera.x=(minX+maxX)/2 - (w/(2*z)); camera.y=(minY+maxY)/2 - (h/(2*z));
+  camera.z=z;
+  camera.x=(minX+maxX)/2 - (w/(2*z));
+  camera.y=(minY+maxY)/2 - (h/(2*z));
+}
+
+function boundsFromPoints(points){
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  for(const [x,y] of points){
+    if(!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if(x<minX) minX=x; if(x>maxX) maxX=x;
+    if(y<minY) minY=y; if(y>maxY) maxY=y;
+  }
+  if(minX===Infinity) return null;
+  return { minX, maxX, minY, maxY };
 }
