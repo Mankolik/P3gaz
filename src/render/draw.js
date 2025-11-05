@@ -4,7 +4,8 @@ const LAYER_STYLES = {
   FIR: { stroke: '#6c757d' },
   SECTOR_LOW: { stroke: '#2f9b46' },
   SECTOR_HIGH: { stroke: '#7a1f3d' },
-  TMA: { stroke: '#22495e' }
+  TMA: { stroke: '#22495e' },
+  ZONES: { stroke: '#ff0000' }
 };
 
 function getStrokeColor(name){
