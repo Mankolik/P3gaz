@@ -19,9 +19,81 @@
       "type": "polygon"
     },
     {
-      "id": "tma_bundle",
-      "path": "./assets/geojson/epd_bundle.geojson",
+      "id": "tma_epgd",
+      "path": "./assets/geojson/epgd_tma_utma.geojson",
       "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_eppo",
+      "path": "./assets/geojson/eppo_tma_north_south.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epby",
+      "path": "./assets/geojson/epby_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epkk_epkt",
+      "path": "./assets/geojson/epkk_epkt_tma_utma_fixed.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_eplb",
+      "path": "./assets/geojson/eplb_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epll",
+      "path": "./assets/geojson/epll_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epra",
+      "path": "./assets/geojson/epra_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_eprz",
+      "path": "./assets/geojson/eprz_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epsc",
+      "path": "./assets/geojson/epsc_tma_heringsdorf.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epsy",
+      "path": "./assets/geojson/epsy_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epwa",
+      "path": "./assets/geojson/epwa_tma_all.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "tma_epzg",
+      "path": "./assets/geojson/epzg_tma.geojson",
+      "layer": "TMA",
+      "type": "polygon"
+    },
+    {
+      "id": "zones_poland",
+      "path": "./assets/geojson/epd_bundle.geojson",
+      "layer": "ZONES",
       "type": "polygon"
     },
     {

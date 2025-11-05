@@ -52,7 +52,13 @@ export function mountTopbar(root, state, bus){
   const pnlMAP=el('div','dropdown-panel');
   ['FIR','SECTOR_LOW','SECTOR_HIGH','TMA','CTR','ZONES','WAYPOINTS','AIRPORTS','ROUTES'].forEach(name=>{
     const row=el('div','row'); const lab=el('div','label',name);
-    const t=toggleText(true, on=>{ const L=state.map.layers.get(name); if(L){ L.visible=on; bus.emit('ui:changed'); } });
+    const initialVisible = state.map.layers.get(name)?.visible ?? true;
+    const t=toggleText(initialVisible, on=>{
+      const layer = state.map.layers.get(name);
+      if(!layer) return;
+      layer.visible = on;
+      bus.emit('ui:changed');
+    });
     row.append(lab,t); pnlMAP.append(row);
   });
   ddMAP.append(pnlMAP); attachOpenClose(ddMAP); gMAP.append(ddMAP); root.append(gMAP);
