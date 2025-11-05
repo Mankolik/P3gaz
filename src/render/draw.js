@@ -1,4 +1,4 @@
-import { getVisibleLayers } from '../map/layers.js';
+import { getVisibleLayers } from './layers.js';
 
 export function drawFrame(canvas, camera, state){
   const {ctx} = canvas;
