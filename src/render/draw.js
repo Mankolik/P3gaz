@@ -21,7 +21,11 @@ export function drawFrame(canvas, camera, state){
   ctx.translate(-camera.x*camera.z, -camera.y*camera.z);
   ctx.scale(camera.z, camera.z);
 
-  for(const [name,layer] of getVisibleLayers(state)){
+  const visibleLayers = [...getVisibleLayers(state)].reverse();
+  let isTopLayer = true;
+  for(const [name,layer] of visibleLayers){
+    ctx.globalCompositeOperation = isTopLayer ? 'source-over' : 'destination-over';
+    isTopLayer = false;
     if(layer.type==='polygon'){
       ctx.lineWidth = 1;
       ctx.strokeStyle = getStrokeColor(name);
@@ -38,5 +42,6 @@ export function drawFrame(canvas, camera, state){
     }
   }
 
+  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 }
