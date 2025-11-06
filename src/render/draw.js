@@ -27,7 +27,9 @@ export function drawFrame(canvas, camera, state){
     ctx.globalCompositeOperation = isTopLayer ? 'source-over' : 'destination-over';
     isTopLayer = false;
     if(layer.type==='polygon'){
-      ctx.lineWidth = 1;
+      // Keep polygon outlines at a consistent screen-space thickness by
+      // compensating for the current zoom level.
+      ctx.lineWidth = 7;
       ctx.strokeStyle = getStrokeColor(name);
       for(const f of layer.features){ if(!f.xy) continue;
         ctx.beginPath();
