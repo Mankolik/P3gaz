@@ -29,7 +29,8 @@ export function drawFrame(canvas, camera, state){
     if(layer.type==='polygon'){
       // Keep polygon outlines at a consistent screen-space thickness by
       // compensating for the current zoom level.
-      ctx.lineWidth = 7;
+      const desiredScreenWidth = 10;
+      ctx.lineWidth = desiredScreenWidth / Math.max(camera.z, 1e-6);
       ctx.strokeStyle = getStrokeColor(name);
       for(const f of layer.features){ if(!f.xy) continue;
         ctx.beginPath();
