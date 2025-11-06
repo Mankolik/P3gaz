@@ -1,9 +1,12 @@
 :root{
   --bg:#020609; --panel:#0d141b; --panel-2:#101a23; --stroke:#1f2a35;
   --text:#cfe4ff; --text-dim:#96acc5; --ok:#2cb67d;
+  --track-green:#00FF55; --track-white:#ffffff; --track-gray:#bfbfbf;
+  --track-blue:#2277ff; --track-amber:#ff9259; --track-red:#ff6659;
+  --track-red-strong:#ff5050;
 }
 *{ box-sizing:border-box }
-html,body{ height:100%; margin:0; background:var(--bg); color:var(--text); font:14px/1.25 system-ui, -apple-system, Segoe UI, Roboto; overflow:hidden }
+html,body{ height:100%; margin:0; background:var(--bg); color:var(--text); font:14px/1.35 'Aldrich', system-ui, -apple-system, 'Segoe UI', Roboto; overflow:hidden }
 #app{ display:grid; grid-template-rows:48px 1fr auto; height:100%; width:100vw; min-height:100svh }
 /* TOP BAR */
 header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--stroke); flex-wrap:wrap }
@@ -24,6 +27,47 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .textbtn.active{ background:#122030; border-color:#2c3d4f; box-shadow:0 0 0 1px #2c3d4f inset }
 /* CANVAS */
 #main{ position:relative; overflow:hidden } #radar{ width:100%; height:100%; display:block; background:#020609; touch-action:none }
+#track-overlay{ position:absolute; inset:0; pointer-events:none; font-family:'VCR OSD Mono','Aldrich','Courier New',monospace; font-size:12px; line-height:1.2; color:var(--track-white); }
+.track-label{ position:absolute; min-width:180px; padding:6px 10px; background:rgba(6,12,18,.88); border:1px solid #1d2a36; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.45); display:flex; flex-direction:column; gap:2px; pointer-events:auto; text-transform:uppercase; transition:transform .1s ease-out; }
+.track-label .row{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
+.track-label .row0{ min-height:10px; font-size:10px; letter-spacing:1px; color:var(--track-red); }
+.track-label .callsign{ font-size:14px; letter-spacing:1px; }
+.track-label .toggle{ cursor:pointer; user-select:none; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
+.track-label .toggle:hover{ background:rgba(255,255,255,.08); }
+.track-label .vs-indicator{ width:14px; text-align:center; }
+.track-label .row2 .levels{ flex:1; letter-spacing:1px; }
+.track-label .row3, .track-label .row4{ font-size:11px; letter-spacing:.5px; }
+.track-label .row4 span{ min-width:34px; text-align:center; }
+.track-label .muted{ color:var(--track-gray); }
+.track-label.status-accepted .callsign,
+.track-label.status-inbound .callsign{ color:var(--track-green); }
+.track-label.status-preinbound{ color:var(--track-gray); }
+.track-label.status-preinbound .callsign{ color:var(--track-white); }
+.track-label.status-intruder{ color:var(--track-red); }
+.track-label.status-intruder .callsign{ color:var(--track-amber); }
+.track-label.status-intruder .muted{ color:var(--track-red); }
+.track-label.status-incoming .callsign{ color:var(--track-blue); }
+.track-label.status-outgoing .callsign{ color:var(--track-red-strong); }
+.track-label.status-incoming .toggle,
+.track-label.status-outgoing .toggle{ color:inherit; }
+.track-label[data-side="left"]{ align-items:flex-end; text-align:right; }
+.track-label[data-side="left"] .row{ justify-content:flex-end; }
+.track-label[data-side="right"]{ align-items:flex-start; text-align:left; }
+.track-label[data-side="right"] .row{ justify-content:flex-start; }
+.track-label .row:hover .muted{ color:var(--track-white); }
+.track-label .row:hover .levels{ color:var(--track-white); }
+.track-label:hover{ border-color:#33506a; }
+.track-label.status-intruder:hover{ border-color:rgba(255,102,89,.7); }
+.track-label.status-incoming:hover{ border-color:rgba(34,119,255,.7); }
+.track-label.status-outgoing:hover{ border-color:rgba(255,80,80,.7); }
+.track-label .levels{ cursor:default; }
+.track-label .levels[data-mode="condensed"]::after{ content:'*'; margin-left:4px; color:var(--track-gray); font-size:9px; vertical-align:top; }
+.track-label .row4 span[data-empty="true"]{ color:rgba(255,255,255,.35); }
+
+@media (max-width: 960px){
+  #track-overlay{ font-size:11px; }
+  .track-label{ min-width:160px; padding:6px 8px; }
+}
 /* BOTTOM BAR */
 footer#bottombar{ background:var(--panel); border-top:1px solid var(--stroke); padding:8px }
 footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; border:1px solid var(--stroke); border-radius:999px }

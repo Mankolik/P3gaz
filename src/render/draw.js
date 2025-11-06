@@ -1,4 +1,5 @@
 import { getVisibleLayers } from './layers.js';
+import { drawTrackSymbols, projectTracksToScreen, syncTrackLabels, drawTrackConnectors } from './tracks.js';
 
 const LAYER_STYLES = {
   FIR: { stroke: '#6c757d' },
@@ -12,10 +13,11 @@ function getStrokeColor(name){
   return LAYER_STYLES[name]?.stroke || '#22495e';
 }
 
-export function drawFrame(canvas, camera, state){
+export function drawFrame(canvas, camera, state, overlay){
   const {ctx} = canvas;
   const w = canvas.el.width / (window.devicePixelRatio||1);
   const h = canvas.el.height / (window.devicePixelRatio||1);
+  const pixelScale = window.devicePixelRatio || 1;
   ctx.clearRect(0,0,w,h);
   ctx.save();
   ctx.translate(-camera.x*camera.z, -camera.y*camera.z);
@@ -29,8 +31,8 @@ export function drawFrame(canvas, camera, state){
     if(layer.type==='polygon'){
       // Keep polygon outlines at a consistent screen-space thickness by
       // compensating for the current zoom level.
-      const desiredScreenWidth = 1;
-      ctx.lineWidth = desiredScreenWidth / Math.max(camera.z, 1e-6);
+      const desiredScreenWidth = 3;
+      ctx.lineWidth = (desiredScreenWidth / pixelScale) / Math.max(camera.z, 1e-6);
       ctx.strokeStyle = getStrokeColor(name);
       for(const f of layer.features){ if(!f.xy) continue;
         ctx.beginPath();
@@ -46,5 +48,18 @@ export function drawFrame(canvas, camera, state){
   }
 
   ctx.globalCompositeOperation = 'source-over';
+  const tracks = state?.air?.tracks || [];
+  if(tracks.length){
+    drawTrackSymbols(ctx, camera, tracks);
+  }
   ctx.restore();
+
+  if(tracks.length){
+    const projected = projectTracksToScreen(tracks, camera);
+    const anchors = overlay ? syncTrackLabels(overlay, projected) : new Map();
+    drawTrackConnectors(ctx, projected, anchors);
+  } else if(overlay){
+    // Remove any stale labels if tracks have been cleared.
+    syncTrackLabels(overlay, []);
+  }
 }
