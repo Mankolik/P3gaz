@@ -16,7 +16,7 @@ export function createState(bus){
       },
     },
     map: { layers: new Map(), projection: 'equirect', index: null },
-    air: { aircraft: [], routes: [] },
+    air: { aircraft: [], routes: [], tracks: [] },
     config: {},
   };
 }

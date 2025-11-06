@@ -11,6 +11,7 @@ import { initDefaultLayers } from './map/layers.js';
 import { registerLayer, addFeatures } from './render/layers.js';
 import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
+import { createDemoTracks } from './radar/tracks.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -21,6 +22,13 @@ async function bootstrap(){
   loadConfig(state);
 
   const canvas = initCanvas(canvasEl);
+  let overlayEl = canvas.el.parentElement?.querySelector('#track-overlay');
+  if(!overlayEl){
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'track-overlay';
+    canvas.el.parentElement?.appendChild(overlayEl);
+  }
+
   const camera = createCamera(canvas.el);
 
   bindInput(canvas.el, bus);
@@ -28,7 +36,7 @@ async function bootstrap(){
   bus.on('camera:zoom', ({scale, x, y})=>camera.zoomAbout(scale, x, y));
 
   createTick(bus);
-  bus.on('tick', ()=>drawFrame(canvas, camera, state));
+  bus.on('tick', ()=>drawFrame(canvas, camera, state, overlayEl));
 
   initDefaultLayers(state);
 
@@ -55,6 +63,7 @@ async function loadDatasets(state, camera, canvasEl){
       }
     }
     const project = createSharedProjection(loaded);
+    state.map.project = project;
     let epwwBounds = null;
     for(const {entry, data} of loaded){
       const features = normalizeGeoJSON(data, project);
@@ -72,6 +81,8 @@ async function loadDatasets(state, camera, canvasEl){
         if(bounds) epwwBounds = mergeBounds(epwwBounds, bounds);
       }
     }
+    state.air.tracks = createDemoTracks(project);
+
     fitAll(state, camera, canvasEl);
     if(epwwBounds) fitBounds(camera, canvasEl, epwwBounds, 80);
   } catch(err){
