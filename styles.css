@@ -39,7 +39,9 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .row2{ gap:0; }
 .track-label .row2 .levels{ flex:1; letter-spacing:1px; margin-left:6px; }
 .track-label .row3, .track-label .row4{ letter-spacing:.5px; }
-.track-label .row4 span{ min-width:28px; text-align:center; }
+.track-label .row4{ gap:4px; }
+.track-label .row4 span{ min-width:22px; text-align:center; }
+.track-label .row4 .assigned-vertical{ min-width:14px; }
 .track-label .muted{ color:var(--track-gray); }
 .track-label.status-accepted{ color:var(--track-green); }
 .track-label.status-accepted .callsign{ color:var(--track-green); }
