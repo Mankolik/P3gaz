@@ -4,6 +4,15 @@ const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
 const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
 const ZERO_WIND = { speed: 0, direction: 0 };
 
+const FEET_PER_FLIGHT_LEVEL = 100;
+const SECONDS_PER_MINUTE = 60;
+const FLIGHT_LEVEL_TOLERANCE = 0.05;
+const MAX_VERTICAL_RATE_FPM = 4000;
+const DEFAULT_VERTICAL_RATE_FPM = 1500;
+const VERTICAL_RATE_CHANGE_PER_SECOND = 1500;
+const MIN_FLIGHT_LEVEL = 0;
+const MAX_FLIGHT_LEVEL = 600;
+
 function toRadians(deg){
   return (Number.isFinite(deg) ? deg : 0) * Math.PI / 180;
 }
@@ -88,6 +97,8 @@ function advanceTrack(track, dtSeconds, project){
   const projected = projectPosition(project, nextLon, nextLat, { x: track.x ?? 0, y: track.y ?? 0 });
   track.x = projected.x;
   track.y = projected.y;
+
+  updateVerticalState(track, dtSeconds);
 
   updateTrackVector(track, project);
 }
@@ -184,5 +195,124 @@ function calculateTargetGroundSpeed(track, assigned, heading){
   const altitudeFt = Number.isFinite(altitudeSource) ? altitudeSource * 100 : 0;
   const wind = track?.wind || ZERO_WIND;
   return calculateGroundSpeedFromInstruction(assigned, altitudeFt, heading, wind);
+}
+
+function clamp(value, min, max){
+  if(!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeVerticalAssignment(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const value = Number(raw.value);
+  if(!Number.isFinite(value)) return null;
+  const comparator = raw.comparator === 'or-greater'
+    ? 'or-greater'
+    : raw.comparator === 'or-less'
+      ? 'or-less'
+      : 'exact';
+  const clamped = clamp(Math.round(value), -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM);
+  return { value: clamped, comparator };
+}
+
+function determineTargetFlightLevel(track){
+  if(!track || typeof track !== 'object') return null;
+  if(Number.isFinite(track.clearedFlightLevel)){
+    return track.clearedFlightLevel;
+  }
+  if(Number.isFinite(track.actualFlightLevel)){
+    return track.actualFlightLevel;
+  }
+  if(Number.isFinite(track.plannedEntryLevel)){
+    return track.plannedEntryLevel;
+  }
+  if(Number.isFinite(track.exitFlightLevel)){
+    return track.exitFlightLevel;
+  }
+  return null;
+}
+
+function updateVerticalState(track, dtSeconds){
+  if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
+    return;
+  }
+
+  let currentLevel = Number(track.actualFlightLevel);
+  if(!Number.isFinite(currentLevel)){
+    const fallback = determineTargetFlightLevel(track);
+    if(fallback!=null){
+      track.actualFlightLevel = clamp(fallback, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+    }
+    track.verticalSpeed = 0;
+    return;
+  }
+
+  const targetLevel = determineTargetFlightLevel(track);
+  if(targetLevel==null){
+    const currentRate = Number(track.verticalSpeed) || 0;
+    const rateDelta = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
+    track.verticalSpeed = approachValue(currentRate, 0, rateDelta);
+    return;
+  }
+
+  const diff = targetLevel - currentLevel;
+  if(Math.abs(diff) <= FLIGHT_LEVEL_TOLERANCE){
+    track.actualFlightLevel = clamp(targetLevel, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+    track.verticalSpeed = 0;
+    return;
+  }
+
+  const assignment = track.verticalRateAssigned ? normalizeVerticalAssignment(track.assignedVertical) : null;
+  const direction = diff > 0 ? 1 : -1;
+  let desiredRate = 0;
+  if(assignment){
+    const magnitude = Math.abs(assignment.value);
+    if(magnitude === 0){
+      desiredRate = 0;
+    }else if(assignment.comparator === 'or-greater'){
+      desiredRate = direction * Math.max(magnitude, Math.abs(Number(track.verticalSpeed) || 0));
+    }else if(assignment.comparator === 'or-less'){
+      desiredRate = direction * Math.min(magnitude, Math.abs(Number(track.verticalSpeed) || magnitude));
+    }else{
+      desiredRate = direction * magnitude;
+    }
+  }else{
+    desiredRate = direction * computeDefaultVerticalRate(Math.abs(diff));
+  }
+
+  const currentRate = Number(track.verticalSpeed) || 0;
+  const maxChange = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
+  const nextRate = approachValue(currentRate, desiredRate, maxChange);
+  const clampedRate = clamp(nextRate, -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM);
+  track.verticalSpeed = Math.abs(clampedRate) < 1 ? 0 : clampedRate;
+
+  const deltaFlightLevel = (track.verticalSpeed * dtSeconds) / (SECONDS_PER_MINUTE * FEET_PER_FLIGHT_LEVEL);
+  let nextLevel = currentLevel + deltaFlightLevel;
+  if((direction > 0 && nextLevel >= targetLevel) || (direction < 0 && nextLevel <= targetLevel)){
+    nextLevel = targetLevel;
+    track.verticalSpeed = 0;
+  }
+  track.actualFlightLevel = clamp(nextLevel, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+}
+
+function computeDefaultVerticalRate(diffFlightLevel){
+  if(!Number.isFinite(diffFlightLevel) || diffFlightLevel <= 0){
+    return 0;
+  }
+  const baseRate = Math.max(DEFAULT_VERTICAL_RATE_FPM, diffFlightLevel * FEET_PER_FLIGHT_LEVEL * 2);
+  return clamp(baseRate, 0, MAX_VERTICAL_RATE_FPM);
+}
+
+function approachValue(current, target, maxDelta){
+  if(!Number.isFinite(current)) current = 0;
+  if(!Number.isFinite(target)) return current;
+  if(!Number.isFinite(maxDelta) || maxDelta <= 0){
+    return target;
+  }
+  const diff = target - current;
+  if(Math.abs(diff) <= maxDelta){
+    return target;
+  }
+  return current + Math.sign(diff) * maxDelta;
 }
 
