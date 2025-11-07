@@ -327,36 +327,26 @@ function determinePrimaryLabel(track){
 function computeLevelDisplay(track){
   const items = levelItemsFromTrack(track);
   if(items.length===0) return { text:'', tooltip:'', condensed:false, items };
-
+  const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
   const formattedValues = items.map(item=>formatFlightLevel(item.value));
-  const tooltipValues = [...formattedValues];
-  const hasAfl = items[0]?.label === 'AFL';
-  const vsIndicator = hasAfl ? formatVsIndicator(track?.verticalSpeed) : '';
-  if(tooltipValues.length>0 && vsIndicator){
-    tooltipValues[0] = `${tooltipValues[0]}${vsIndicator}`;
-  }
-  const tooltip = tooltipValues.join(' ');
-
-  const figureSpace = ' ';
   const tokens = [];
   const figureSpace = ' ';
   let lastValue = null;
   let suppressedCount = 0;
   let condensed = false;
-  let suppressedCount = 0;
-  let lastValue = hasAfl ? formattedValues[0] ?? null : null;
-  const displayStartIndex = hasAfl ? 1 : 0;
-
   const flushSuppressed = ()=>{
     if(suppressedCount>0){
       tokens.push(figureSpace.repeat(suppressedCount * 3));
       suppressedCount = 0;
     }
   };
-
-  for(let index = displayStartIndex; index < formattedValues.length; index+=1){
-    const value = formattedValues[index];
-    if(lastValue!=null && value === lastValue){
+  for(const value of formattedValues){
+    if(tokens.length===0){
+      tokens.push(value);
+      lastValue = value;
+      continue;
+    }
+    if(value === lastValue){
       condensed = true;
       suppressedCount += 1;
       continue;
@@ -717,8 +707,7 @@ function updateLabelNode(node, track){
   node.levelsDisplay.textContent = levelDisplay.text;
   node.levels.dataset.mode = levelDisplay.condensed ? 'condensed' : 'full';
   node.levels.title = levelDisplay.tooltip;
-  const extraLevelCount = levelDisplay.items.length - (levelDisplay.items[0]?.label === 'AFL' ? 1 : 0);
-  const hasDisplayLevels = extraLevelCount > 0;
+  const hasDisplayLevels = (levelDisplay.text || '').trim().length > 0;
   node.levels.classList.toggle('muted', !hasDisplayLevels);
   updateLevelSegments(node, track, levelDisplay.items || []);
 
