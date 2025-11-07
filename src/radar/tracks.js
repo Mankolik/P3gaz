@@ -1,3 +1,5 @@
+import { parseSpeedInstruction } from '../utils/speed.js';
+
 const KNOWN_TRACK_STATUSES = new Set([
   'accepted',
   'inbound',
@@ -17,6 +19,7 @@ function baseTrack(data, project, index){
   const vectorScale = data.vectorScale || 8;
   const vectorMinutes = data.vectorMinutes || 6;
   const status = KNOWN_TRACK_STATUSES.has(data.status) ? data.status : 'accepted';
+  const speedInstruction = parseSpeedInstruction(data.assignedSpeed, data.speedMode || data.speedInstructionMode || 'IAS');
   const base = {
     id,
     callsign: data.callsign || id.toUpperCase(),
@@ -40,8 +43,9 @@ function baseTrack(data, project, index){
     destination: data.destination,
     exitPoint: data.exitPoint,
     assignedHeading: data.assignedHeading,
-    assignedSpeed: data.assignedSpeed,
+    assignedSpeed: speedInstruction,
     verticalRateAssigned: data.verticalRateAssigned || false,
+    assignedVertical: data.assignedVertical ?? null,
     expectedCruiseLevel: data.expectedCruiseLevel,
     alerts: data.alerts || [],
     labelSide: data.labelSide,
