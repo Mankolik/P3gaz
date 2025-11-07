@@ -121,11 +121,8 @@ function formatHeading(hdg){
 function levelItemsFromTrack(track){
   const items = [];
   if(track.actualFlightLevel!=null) items.push({ label:'AFL', value:track.actualFlightLevel });
-  if(track.levelMode==='pel'){
-    if(track.plannedEntryLevel!=null) items.push({ label:'PEL', value:track.plannedEntryLevel });
-  }else if(track.clearedFlightLevel!=null){
-    items.push({ label:'CFL', value:track.clearedFlightLevel });
-  }
+  if(track.plannedEntryLevel!=null) items.push({ label:'PEL', value:track.plannedEntryLevel });
+  if(track.clearedFlightLevel!=null) items.push({ label:'CFL', value:track.clearedFlightLevel });
   if(track.exitFlightLevel!=null) items.push({ label:'XFL', value:track.exitFlightLevel });
   return items;
 }
@@ -150,13 +147,19 @@ function computeLevelDisplay(track){
   }
   const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
   const condensed = displayValues.length < values.length;
-  return { text: displayValues.join(' / '), tooltip, condensed };
+  return { text: displayValues.join(' '), tooltip, condensed };
 }
 
 function formatVsIndicator(vs){
   if(vs>0) return '↑';
   if(vs<0) return '↓';
   return '→';
+}
+
+function formatExpectedLevel(level){
+  if(level==null || Number.isNaN(level)) return '--';
+  const value = Math.round(level);
+  return Math.floor(value / 10).toString().padStart(2, '0');
 }
 
 function ensureOverlayCache(overlay){
@@ -281,7 +284,7 @@ function updateLabelNode(node, track){
   node.callsign.textContent = track.callsign || 'UNKNOWN';
 
   const showGs = track.showGroundSpeed !== false;
-  const speedLabel = showGs ? `GS ${formatGroundSpeed(track.groundSpeed)}` : `VS ${formatVerticalSpeed(track.verticalSpeed)}`;
+  const speedLabel = showGs ? formatGroundSpeed(track.groundSpeed) : `VS ${formatVerticalSpeed(track.verticalSpeed)}`;
   node.speedToggle.textContent = speedLabel;
   node.speedToggle.classList.toggle('muted', false);
   node.speedToggle.title = showGs ? 'Show vertical speed' : 'Show ground speed';
@@ -318,9 +321,9 @@ function updateLabelNode(node, track){
   node.assignedVertical.textContent = verticalValue;
   node.assignedVertical.dataset.empty = false;
 
-  const eclValue = track.expectedCruiseLevel!=null ? formatFlightLevel(track.expectedCruiseLevel) : '---';
+  const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
-  node.ecl.dataset.empty = eclValue === '---';
+  node.ecl.dataset.empty = eclValue === '--';
   node.needsMeasure = true;
 }
 

@@ -28,16 +28,17 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 /* CANVAS */
 #main{ position:relative; overflow:hidden } #radar{ width:100%; height:100%; display:block; background:#020609; touch-action:none }
 #track-overlay{ position:absolute; inset:0; pointer-events:none; font-family:'VCR OSD Mono','Aldrich','Courier New',monospace; font-size:12px; line-height:1.2; color:var(--track-white); }
-.track-label{ position:absolute; min-width:180px; padding:6px 10px; background:rgba(6,12,18,.88); border:1px solid #1d2a36; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.45); display:flex; flex-direction:column; gap:2px; pointer-events:auto; text-transform:uppercase; transition:transform .1s ease-out; }
-.track-label .row{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
-.track-label .row0{ min-height:10px; font-size:10px; letter-spacing:1px; color:var(--track-red); }
-.track-label .callsign{ font-size:14px; letter-spacing:1px; }
+.track-label{ position:absolute; min-width:150px; padding:4px 6px; background:transparent; border:none; border-radius:6px; box-shadow:none; display:flex; flex-direction:column; gap:1px; pointer-events:auto; text-transform:uppercase; transition:transform .1s ease-out; font-size:12px; }
+.track-label .row{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.track-label .row0{ min-height:10px; letter-spacing:1px; color:var(--track-red); }
+.track-label .callsign{ letter-spacing:1px; }
 .track-label .toggle{ cursor:pointer; user-select:none; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .toggle:hover{ background:rgba(255,255,255,.08); }
-.track-label .vs-indicator{ width:14px; text-align:center; }
-.track-label .row2 .levels{ flex:1; letter-spacing:1px; }
-.track-label .row3, .track-label .row4{ font-size:11px; letter-spacing:.5px; }
-.track-label .row4 span{ min-width:34px; text-align:center; }
+.track-label .vs-indicator{ width:auto; text-align:left; }
+.track-label .row2{ gap:0; }
+.track-label .row2 .levels{ flex:1; letter-spacing:1px; margin-left:6px; }
+.track-label .row3, .track-label .row4{ letter-spacing:.5px; }
+.track-label .row4 span{ min-width:28px; text-align:center; }
 .track-label .muted{ color:var(--track-gray); }
 .track-label.status-accepted .callsign,
 .track-label.status-inbound .callsign{ color:var(--track-green); }
@@ -56,17 +57,13 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label[data-side="right"] .row{ justify-content:flex-start; }
 .track-label .row:hover .muted{ color:var(--track-white); }
 .track-label .row:hover .levels{ color:var(--track-white); }
-.track-label:hover{ border-color:#33506a; }
-.track-label.status-intruder:hover{ border-color:rgba(255,102,89,.7); }
-.track-label.status-incoming:hover{ border-color:rgba(34,119,255,.7); }
-.track-label.status-outgoing:hover{ border-color:rgba(255,80,80,.7); }
 .track-label .levels{ cursor:default; }
 .track-label .levels[data-mode="condensed"]::after{ content:'*'; margin-left:4px; color:var(--track-gray); font-size:9px; vertical-align:top; }
 .track-label .row4 span[data-empty="true"]{ color:rgba(255,255,255,.35); }
 
 @media (max-width: 960px){
   #track-overlay{ font-size:11px; }
-  .track-label{ min-width:160px; padding:6px 8px; }
+  .track-label{ min-width:140px; padding:4px 6px; }
 }
 /* BOTTOM BAR */
 footer#bottombar{ background:var(--panel); border-top:1px solid var(--stroke); padding:8px }
