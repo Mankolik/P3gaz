@@ -45,6 +45,7 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .level-segment{ display:inline-flex; align-items:center; gap:3px; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .level-segment__label{ display:none; font-size:10px; letter-spacing:1px; }
 .track-label .level-segment__value{ min-width:24px; text-align:center; }
+.track-label .levels:hover .level-segment__label{ display:inline; }
 .track-label .level-segment[data-role="afl"]{ display:none; }
 .track-label .levels:hover .level-segment[data-role="afl"]{ display:inline-flex; }
 .track-label .level-segment.editable{ cursor:pointer; }
