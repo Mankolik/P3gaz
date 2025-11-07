@@ -4,8 +4,6 @@ const KNOWN_TRACK_STATUSES = new Set([
   'preinbound',
   'intruder',
   'unconcerned',
-  'incoming',
-  'outgoing',
 ]);
 
 function normalizeHeading(heading){
@@ -166,7 +164,7 @@ export function createDemoTracks(project){
     {
       id: 'BAW77',
       callsign: 'BAW77',
-      status: 'outgoing',
+      status: 'accepted',
       lat: 53.4,
       lon: 14.5,
       heading: 302,

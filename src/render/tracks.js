@@ -5,8 +5,6 @@ const STATUS_COLORS = {
   preinbound: '#bfbfbf',
   intruder: '#ff6659',
   unconcerned: '#bfbfbf',
-  incoming: '#2277ff',
-  outgoing: '#ff5050',
 };
 
 const STATUS_STROKES = {
@@ -25,8 +23,6 @@ const VECTOR_COLORS = {
   intruder: '#ff6659',
   unconcerned: '#bfbfbf',
   default: '#bfbfbf',
-  incoming: '#2277ff',
-  outgoing: '#ff5050',
 };
 const DEFAULT_LABEL_OFFSET = { x: 78, y: 0 };
 
@@ -191,30 +187,26 @@ function levelItemsFromTrack(track){
 function computeLevelDisplay(track){
   const items = levelItemsFromTrack(track);
   if(items.length===0) return { text:'', tooltip:'', condensed:false };
-  const values = items.map(item=>formatFlightLevel(item.value));
-  let displayValues = [];
-  if(values.every(v=>v===values[0])){
-    displayValues = [values[0]];
-  }else if(values.length>=3 && values[0]===values[1] && values[0]!==values[values.length-1]){
-    displayValues = [values[0], values[values.length-1]];
-  }else{
-    let last = null;
-    for(const v of values){
-      if(v!==last){
-        displayValues.push(v);
-        last = v;
-      }
+  const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
+  const displayItems = items.filter(item=>item.label !== 'AFL');
+  if(displayItems.length===0){
+    return { text:'', tooltip, condensed:false };
+  }
+  const rawValues = displayItems.map(item=>formatFlightLevel(item.value));
+  const displayValues = [];
+  for(const value of rawValues){
+    if(displayValues.length===0 || displayValues[displayValues.length-1] !== value){
+      displayValues.push(value);
     }
   }
-  const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
-  const condensed = displayValues.length < values.length;
+  const condensed = displayValues.length < rawValues.length;
   return { text: displayValues.join(' '), tooltip, condensed };
 }
 
 function formatVsIndicator(vs){
   if(vs>0) return '↑';
   if(vs<0) return '↓';
-  return '→';
+  return '';
 }
 
 function formatExpectedLevel(level){

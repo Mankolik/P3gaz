@@ -55,10 +55,6 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label.status-unconcerned{ color:var(--track-gray); }
 .track-label.status-unconcerned .callsign{ color:var(--track-gray); }
 .track-label.status-unconcerned .muted{ color:var(--track-gray); }
-.track-label.status-incoming .callsign{ color:var(--track-blue); }
-.track-label.status-outgoing .callsign{ color:var(--track-red-strong); }
-.track-label.status-incoming .toggle,
-.track-label.status-outgoing .toggle{ color:inherit; }
 .track-label[data-side="left"],
 .track-label[data-side="right"]{ align-items:flex-start; text-align:left; }
 .track-label[data-side="left"] .row,
