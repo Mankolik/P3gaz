@@ -43,7 +43,9 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .levels:hover .levels__display{ display:none; }
 .track-label .levels:hover .levels__detail{ display:inline-flex; }
 .track-label .level-segment{ display:inline-flex; align-items:center; gap:3px; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
+.track-label .level-segment[data-role="afl"]{ gap:0; }
 .track-label .level-segment__trend{ display:none; min-width:10px; text-align:center; }
+.track-label .level-segment[data-role="afl"] .level-segment__trend{ min-width:0; }
 .track-label .level-segment.has-trend .level-segment__trend{ display:inline; }
 .track-label .level-segment__label{ display:none; font-size:10px; letter-spacing:1px; }
 .track-label .level-segment__value{ min-width:24px; text-align:center; }

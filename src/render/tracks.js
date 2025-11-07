@@ -483,7 +483,7 @@ function createLabelNode(){
     const value = document.createElement('span');
     value.className = 'level-segment__value';
     if(trend){
-      segment.append(label, trend, value);
+      segment.append(label, value, trend);
     }else{
       segment.append(label, value);
     }
