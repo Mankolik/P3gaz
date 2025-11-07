@@ -35,14 +35,15 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .callsign{ letter-spacing:1px; }
 .track-label .toggle{ cursor:pointer; user-select:none; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .toggle:hover{ background:rgba(255,255,255,.08); }
-.track-label .vs-indicator{ width:auto; text-align:left; }
 .track-label .row2{ gap:0; }
-.track-label .row2 .levels{ flex:1; letter-spacing:1px; margin-left:6px; display:inline-flex; align-items:center; gap:4px; }
+.track-label .row2 .levels{ flex:1; letter-spacing:1px; margin-left:0; display:inline-flex; align-items:center; gap:4px; }
 .track-label .levels__display{ display:inline; flex:1; }
 .track-label .levels__detail{ display:none; gap:4px; align-items:center; flex:1; }
 .track-label .levels:hover .levels__display{ display:none; }
 .track-label .levels:hover .levels__detail{ display:inline-flex; }
 .track-label .level-segment{ display:inline-flex; align-items:center; gap:3px; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
+.track-label .level-segment__trend{ display:none; min-width:10px; text-align:center; }
+.track-label .level-segment.has-trend .level-segment__trend{ display:inline; }
 .track-label .level-segment__label{ display:none; font-size:10px; letter-spacing:1px; }
 .track-label .level-segment__value{ min-width:24px; text-align:center; }
 .track-label .levels:hover .level-segment__label{ display:inline; }

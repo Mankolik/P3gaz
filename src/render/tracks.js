@@ -364,7 +364,8 @@ function updateLevelSegments(node, track, items){
   if(!node || !node.levelSegments) return;
   const segments = node.levelSegments;
   const aflItem = items.find(item=>item.label === 'AFL');
-  applyLevelSegment(segments.afl, 'AFL', aflItem?.value ?? track?.actualFlightLevel, null, false);
+  const aflTrend = formatVsIndicator(track?.verticalSpeed);
+  applyLevelSegment(segments.afl, 'AFL', aflItem?.value ?? track?.actualFlightLevel, null, false, aflTrend);
 
   const primaryItem = items.find(item=>item.label === 'CFL' || item.label === 'PEL');
   const primaryLabel = primaryItem?.label || determinePrimaryLabel(track) || 'CFL';
@@ -378,10 +379,15 @@ function updateLevelSegments(node, track, items){
   applyLevelSegment(segments.exit, 'XFL', exitValue, 'exitFlightLevel', true);
 }
 
-function applyLevelSegment(segment, label, value, field, editable){
+function applyLevelSegment(segment, label, value, field, editable, trend){
   if(!segment) return;
   segment.label.textContent = label || '';
   segment.value.textContent = formatFlightLevel(value);
+  if(segment.trend){
+    const trendValue = trend || '';
+    segment.trend.textContent = trendValue;
+    segment.segment.classList.toggle('has-trend', trendValue.length>0);
+  }
   if(field){
     segment.segment.dataset.field = field;
   }else{
@@ -441,10 +447,6 @@ function createLabelNode(){
 
   row1.append(callsign, speedToggle);
 
-  const afl = document.createElement('span');
-  afl.className = 'afl';
-  const vsIndicator = document.createElement('span');
-  vsIndicator.className = 'vs-indicator muted';
   const levels = document.createElement('span');
   levels.className = 'levels muted';
   const levelsDisplay = document.createElement('span');
@@ -458,10 +460,18 @@ function createLabelNode(){
     segment.dataset.role = role;
     const label = document.createElement('span');
     label.className = 'level-segment__label';
+    const trend = role === 'afl' ? document.createElement('span') : null;
+    if(trend){
+      trend.className = 'level-segment__trend';
+    }
     const value = document.createElement('span');
     value.className = 'level-segment__value';
-    segment.append(label, value);
-    return { segment, label, value };
+    if(trend){
+      segment.append(label, trend, value);
+    }else{
+      segment.append(label, value);
+    }
+    return { segment, label, value, trend };
   };
 
   const levelAfl = createLevelSegment('afl');
@@ -471,7 +481,7 @@ function createLabelNode(){
   levelsDetail.append(levelAfl.segment, levelPrimary.segment, levelExit.segment);
   levels.append(levelsDisplay, levelsDetail);
 
-  row2.append(afl, vsIndicator, levels);
+  row2.append(levels);
 
   const typeToggle = document.createElement('span');
   typeToggle.className = 'toggle type muted';
@@ -500,8 +510,6 @@ function createLabelNode(){
     row0,
     callsign,
     speedToggle,
-    afl,
-    vsIndicator,
     levels,
     levelsDisplay,
     levelsDetail,
@@ -698,16 +706,15 @@ function updateLabelNode(node, track){
   node.speedToggle.classList.toggle('muted', false);
   node.speedToggle.title = showGs ? 'Show vertical speed' : 'Show ground speed';
 
-  node.afl.textContent = formatFlightLevel(track.actualFlightLevel);
-
-  node.vsIndicator.textContent = formatVsIndicator(track.verticalSpeed);
-  node.vsIndicator.classList.toggle('muted', track.verticalSpeed==null || track.verticalSpeed===0);
-
   const levelDisplay = computeLevelDisplay(track);
-  node.levelsDisplay.textContent = levelDisplay.text;
+  const trendIndicator = formatVsIndicator(track.verticalSpeed);
+  const displayText = levelDisplay.text;
+  node.levelsDisplay.textContent = trendIndicator && displayText
+    ? `${trendIndicator} ${displayText}`
+    : (displayText || trendIndicator || '');
   node.levels.dataset.mode = levelDisplay.condensed ? 'condensed' : 'full';
   node.levels.title = levelDisplay.tooltip;
-  const hasDisplayLevels = (levelDisplay.text || '').trim().length > 0;
+  const hasDisplayLevels = (node.levelsDisplay.textContent || '').trim().length > 0;
   node.levels.classList.toggle('muted', !hasDisplayLevels);
   updateLevelSegments(node, track, levelDisplay.items || []);
 
