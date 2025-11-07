@@ -17,6 +17,14 @@ const STATUS_STROKES = {
 const DEFAULT_SYMBOL_SIZE = 18;
 const DEFAULT_VECTOR_SCALE = 6;
 const CONNECTOR_COLOR = '#bfbfbf';
+const VECTOR_COLORS = {
+  accepted: '#00FF55',
+  inbound: '#ffffff',
+  preinbound: '#ffffff',
+  intruder: '#ff6659',
+  unconcerned: '#bfbfbf',
+  default: '#bfbfbf',
+};
 const DEFAULT_LABEL_OFFSET = { x: 78, y: 0 };
 
 function degToRad(heading){
@@ -41,10 +49,11 @@ export function drawTrackSymbols(ctx, camera, tracks){
     ctx.rotate(rad);
     ctx.lineWidth = invZoom / pixelScale;
     if(vecLength > 0){
+      const vectorColor = VECTOR_COLORS[track.status] || VECTOR_COLORS.default;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(vecLength, 0);
-      ctx.strokeStyle = CONNECTOR_COLOR;
+      ctx.strokeStyle = vectorColor;
       ctx.stroke();
     }
     ctx.beginPath();
