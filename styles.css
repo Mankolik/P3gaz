@@ -77,8 +77,8 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-picker__option.selected{ background:#122030; border-color:#1f2c3b; }
 .track-picker__manual{ display:flex; gap:6px; align-items:center; }
 .track-picker__manual input{ flex:1; background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 6px; color:inherit; font-size:12px; }
-.track-picker__apply,.track-picker__clear,.track-picker__controls button,.track-picker__mode-toggle button{ background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 8px; color:inherit; cursor:pointer; font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
-.track-picker__apply:hover,.track-picker__clear:hover,.track-picker__controls button:hover,.track-picker__mode-toggle button:hover{ background:#162230; }
+.track-picker__clear,.track-picker__controls button,.track-picker__mode-toggle button{ background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 8px; color:inherit; cursor:pointer; font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.track-picker__clear:hover,.track-picker__controls button:hover,.track-picker__mode-toggle button:hover{ background:#162230; }
 .track-picker__controls{ display:flex; gap:6px; justify-content:flex-end; }
 .track-picker__controls button.active,.track-picker__mode-toggle button.active{ background:#1f2d3d; border-color:#2f4258; }
 .track-picker__mode-toggle{ display:flex; gap:6px; justify-content:flex-end; }

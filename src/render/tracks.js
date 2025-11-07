@@ -1,4 +1,4 @@
-import { formatSpeedInstruction, parseSpeedInstruction } from '../utils/speed.js';
+import { parseSpeedInstruction } from '../utils/speed.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -52,6 +52,13 @@ let activeTrackPicker = null;
 function degToRad(heading){
   const deg = Number.isFinite(heading) ? heading : 0;
   return (deg - 90) * Math.PI / 180;
+}
+
+function nowMs(){
+  if(typeof performance !== 'undefined' && typeof performance.now === 'function'){
+    return performance.now();
+  }
+  return Date.now();
 }
 
 export function drawTrackSymbols(ctx, camera, tracks){
@@ -187,8 +194,20 @@ function normalizeSpeedAssignment(track){
 }
 
 function formatAssignedSpeedDisplay(assignment){
-  if(!assignment) return '';
-  return formatSpeedInstruction(assignment) || '';
+  if(!assignment || assignment.value==null || Number.isNaN(assignment.value)){
+    return '';
+  }
+  const mode = String(assignment.mode || 'IAS').toUpperCase().startsWith('M') ? 'Mach' : 'IAS';
+  if(mode === 'Mach'){
+    const mach = Number(assignment.value);
+    if(!Number.isFinite(mach)) return '';
+    const hundredths = Math.round(mach * 100).toString().padStart(2, '0');
+    return `M${hundredths} (Mach ${mach.toFixed(2)})`;
+  }
+  const knots = Math.round(Number(assignment.value));
+  if(!Number.isFinite(knots) || knots <= 0) return '';
+  const tens = Math.round(knots / 10).toString().padStart(2, '0');
+  return `N${tens} (${knots}kt)`;
 }
 
 function normalizeVerticalAssignment(track, preserveFlag=false){
@@ -396,6 +415,9 @@ function createLabelNode(){
     dragState: null,
     lastScreen: null,
     activePicker: null,
+    lastGroundSpeed: null,
+    lastVerticalSpeed: null,
+    lastMetricsUpdate: 0,
   };
 
   speedToggle.addEventListener('click', evt=>{
@@ -566,23 +588,34 @@ function updateLabelNode(node, track){
   const headingValue = formatHeading(track.assignedHeading);
   node.assignedHeading.textContent = headingValue;
   node.assignedHeading.dataset.empty = headingValue === 'h';
+  node.assignedHeading.title = headingValue === 'h' ? '' : headingValue;
 
   const speedValue = formatAssignedSpeedDisplay(speedAssignment);
   node.assignedSpeed.textContent = speedValue || 's';
   node.assignedSpeed.dataset.empty = !speedValue;
   node.assignedSpeed.dataset.mode = speedAssignment?.mode === 'Mach' ? 'mach' : 'ias';
+  node.assignedSpeed.title = speedValue || '';
 
   const verticalValue = formatAssignedVerticalDisplay(verticalAssignment);
-  const hasVerticalAssignment = !!verticalValue;
-  const verticalPlaceholder = track.verticalRateAssigned && !hasVerticalAssignment ? 'R' : 'r';
-  node.assignedVertical.textContent = hasVerticalAssignment ? verticalValue : verticalPlaceholder;
-  node.assignedVertical.dataset.empty = !hasVerticalAssignment && !track.verticalRateAssigned;
-  node.assignedVertical.dataset.mode = verticalAssignment?.comparator || (track.verticalRateAssigned ? 'pending' : 'exact');
+  const hasVerticalAssignment = track.verticalRateAssigned && !!verticalAssignment;
+  node.assignedVertical.textContent = track.verticalRateAssigned ? 'R' : 'r';
+  node.assignedVertical.dataset.empty = !track.verticalRateAssigned;
+  node.assignedVertical.dataset.mode = hasVerticalAssignment
+    ? (verticalAssignment?.comparator || 'exact')
+    : (track.verticalRateAssigned ? 'pending' : 'exact');
+  node.assignedVertical.dataset.value = verticalValue || '';
+  node.assignedVertical.title = track.verticalRateAssigned
+    ? (verticalValue ? `${verticalValue} FPM` : 'Rate assigned')
+    : '';
 
   const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
   node.ecl.dataset.empty = eclValue === '--';
   node.needsMeasure = true;
+
+  node.lastGroundSpeed = Number.isFinite(track.groundSpeed) ? Math.round(track.groundSpeed) : null;
+  node.lastVerticalSpeed = Number.isFinite(track.verticalSpeed) ? Math.round(track.verticalSpeed) : null;
+  node.lastMetricsUpdate = nowMs();
 }
 
 function measureLabel(node){
@@ -634,7 +667,7 @@ export function syncTrackLabels(overlay, projected){
       updateLabelNode(node, track);
     }else{
       const revision = getTrackRevision(track);
-      if(node.track !== track || node.revision !== revision){
+      if(node.track !== track || node.revision !== revision || shouldRefreshMetrics(node, track)){
         updateLabelNode(node, track);
       }
     }
@@ -662,6 +695,18 @@ function closeActivePicker(){
     activeTrackPicker.node.activePicker = null;
   }
   activeTrackPicker = null;
+}
+
+function shouldRefreshMetrics(node, track){
+  if(!node || !track) return false;
+  const now = nowMs();
+  const elapsed = now - (node.lastMetricsUpdate || 0);
+  const ground = Number.isFinite(track.groundSpeed) ? Math.round(track.groundSpeed) : null;
+  const vertical = Number.isFinite(track.verticalSpeed) ? Math.round(track.verticalSpeed) : null;
+  if(node.lastGroundSpeed !== ground || node.lastVerticalSpeed !== vertical){
+    return true;
+  }
+  return elapsed >= 3000;
 }
 
 function showTrackPicker(node, anchor, className, build){
@@ -730,14 +775,11 @@ function createManualInput(options){
   if(min!=null) input.min = String(min);
   if(max!=null) input.max = String(max);
   if(placeholder) input.placeholder = placeholder;
+  input.title = 'Press Enter to apply';
   if(defaultValue!=null && defaultValue!==''){
     input.value = defaultValue;
   }
   container.appendChild(input);
-  const submit = document.createElement('button');
-  submit.type = 'button';
-  submit.className = 'track-picker__apply';
-  submit.textContent = 'Set';
   const handleSubmit = ()=>{
     if(typeof onSubmit !== 'function'){
       if(typeof close === 'function') close();
@@ -748,11 +790,6 @@ function createManualInput(options){
       close();
     }
   };
-  submit.addEventListener('click', evt=>{
-    evt.preventDefault();
-    evt.stopPropagation();
-    handleSubmit();
-  });
   input.addEventListener('keydown', evt=>{
     if(evt.key === 'Enter'){
       evt.preventDefault();
@@ -760,7 +797,6 @@ function createManualInput(options){
     }
     evt.stopPropagation();
   });
-  container.appendChild(submit);
   if(typeof onClear === 'function'){
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
@@ -769,6 +805,7 @@ function createManualInput(options){
     clearBtn.addEventListener('click', evt=>{
       evt.preventDefault();
       evt.stopPropagation();
+      input.value = '';
       onClear();
       if(typeof close === 'function') close();
     });
