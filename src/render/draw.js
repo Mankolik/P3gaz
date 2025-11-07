@@ -5,7 +5,8 @@ const LAYER_STYLES = {
   FIR: { stroke: '#6c757d' },
   SECTOR_LOW: { stroke: '#2f9b46' },
   SECTOR_HIGH: { stroke: '#7a1f3d' },
-  TMA: { stroke: '#22495e' },
+  TMA_LOWER: { stroke: '#22495e' },
+  TMA_UPPER: { stroke: '#1b6078' },
   ZONES: { stroke: '#ff0000' }
 };
 

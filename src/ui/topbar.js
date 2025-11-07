@@ -50,7 +50,7 @@ export function mountTopbar(root, state, bus){
   // MAP (stubs)
   const gMAP=wrap('MAP'); const ddMAP=el('div','dropdown'); ddMAP.append(el('div','value','Layers'), el('div','chev','▾'));
   const pnlMAP=el('div','dropdown-panel');
-  ['FIR','SECTOR_LOW','SECTOR_HIGH','TMA','CTR','ZONES','WAYPOINTS','AIRPORTS','ROUTES'].forEach(name=>{
+  ['FIR','SECTOR_LOW','SECTOR_HIGH','TMA_LOWER','TMA_UPPER','CTR','ZONES','WAYPOINTS','AIRPORTS','ROUTES'].forEach(name=>{
     const row=el('div','row'); const lab=el('div','label',name);
     const initialVisible = state.map.layers.get(name)?.visible ?? true;
     const t=toggleText(initialVisible, on=>{
