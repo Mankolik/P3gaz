@@ -37,14 +37,18 @@ function degToRad(heading){
 
 export function drawTrackSymbols(ctx, camera, tracks){
   if(!ctx || !camera || !Array.isArray(tracks) || !tracks.length) return;
-  const invZoom = 1 / Math.max(camera.z || 1, 1e-6);
+  const zoom = Math.max(camera.z || 1, 1e-6);
+  const invZoom = 1 / zoom;
   const pixelScale = window.devicePixelRatio || 1;
   for(const track of tracks){
     if(track?.x==null || track?.y==null) continue;
     const fill = STATUS_COLORS[track.status] || STATUS_COLORS.default;
     const stroke = STATUS_STROKES[track.status] || STATUS_STROKES.default;
     const size = (track.symbolSize || DEFAULT_SYMBOL_SIZE) * invZoom;
-    const vecLength = (track.vectorMinutes || 0) * (track.vectorScale || DEFAULT_VECTOR_SCALE) * invZoom;
+    const vectorMinutes = Math.max(track.vectorMinutes || 0, 0);
+    const rawScale = Number.isFinite(track.vectorScale) ? track.vectorScale : DEFAULT_VECTOR_SCALE;
+    const vectorScale = rawScale > 0 ? rawScale : DEFAULT_VECTOR_SCALE;
+    const vecLength = vectorMinutes * vectorScale;
     const half = size / 2;
     const rad = degToRad(track.heading);
     ctx.save();

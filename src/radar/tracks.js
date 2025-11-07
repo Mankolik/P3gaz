@@ -1,3 +1,13 @@
+const KNOWN_TRACK_STATUSES = new Set([
+  'accepted',
+  'inbound',
+  'preinbound',
+  'intruder',
+  'unconcerned',
+  'incoming',
+  'outgoing',
+]);
+
 function normalizeHeading(heading){
   if(heading==null || Number.isNaN(heading)) return 0;
   return ((heading % 360) + 360) % 360;
@@ -8,10 +18,11 @@ function baseTrack(data, project, index){
   const heading = normalizeHeading(data.heading);
   const vectorScale = data.vectorScale || 8;
   const vectorMinutes = data.vectorMinutes || 6;
+  const status = KNOWN_TRACK_STATUSES.has(data.status) ? data.status : 'accepted';
   const base = {
     id,
     callsign: data.callsign || id.toUpperCase(),
-    status: data.status || 'accepted',
+    status,
     lat: data.lat,
     lon: data.lon,
     heading,
@@ -62,7 +73,7 @@ export function createDemoTracks(project){
       heading: 278,
       vectorMinutes: 7,
       groundSpeed: 451,
-      verticalSpeed: 20,
+      verticalSpeed: 0,
       actualFlightLevel: 380,
       clearedFlightLevel: 380,
       exitFlightLevel: 380,
@@ -94,6 +105,7 @@ export function createDemoTracks(project){
       aircraftType: 'E75L',
       squawk: '4132',
       wake: 'M',
+      destination: 'EPWA',
       exitPoint: 'DOSAP',
       assignedHeading: null,
       assignedSpeed: null,
@@ -130,7 +142,7 @@ export function createDemoTracks(project){
     {
       id: 'SAS442',
       callsign: 'SAS442',
-      status: 'incoming',
+      status: 'inbound',
       lat: 52.4,
       lon: 16.83,
       heading: 122,
@@ -138,12 +150,13 @@ export function createDemoTracks(project){
       groundSpeed: 410,
       verticalSpeed: 5,
       actualFlightLevel: 240,
+      plannedEntryLevel: 230,
       clearedFlightLevel: 260,
       exitFlightLevel: 260,
       aircraftType: 'CRJ9',
       squawk: '4521',
       wake: 'M',
-      destination: 'ESMS',
+      destination: 'ESSA',
       assignedHeading: 118,
       assignedSpeed: 'N23',
       verticalRateAssigned: true,
