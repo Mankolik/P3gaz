@@ -38,6 +38,9 @@ const VERTICAL_RATE_MIN = -4000;
 const VERTICAL_RATE_MAX = 4000;
 const VERTICAL_RATE_STEP = 500;
 const MACH_LABEL_PRECISION = 2;
+const LEVEL_MIN = 0;
+const LEVEL_MAX = 600;
+const LEVEL_STEP = 10;
 
 const HEADING_OPTIONS = Array.from({ length: Math.floor(360 / HEADING_STEP) }, (_, index)=>index * HEADING_STEP);
 const IAS_SPEED_OPTIONS = Array.from({ length: Math.floor((IAS_SPEED_MAX - IAS_SPEED_MIN) / IAS_SPEED_STEP) + 1 },
@@ -46,6 +49,11 @@ const MACH_SPEED_OPTIONS = Array.from({ length: Math.floor((MACH_SPEED_MAX - MAC
   (_, index)=>Number((MACH_SPEED_MIN + index * MACH_SPEED_STEP).toFixed(MACH_LABEL_PRECISION)));
 const VERTICAL_RATE_OPTIONS = Array.from({ length: Math.floor((VERTICAL_RATE_MAX - VERTICAL_RATE_MIN) / VERTICAL_RATE_STEP) + 1 },
   (_, index)=>VERTICAL_RATE_MIN + index * VERTICAL_RATE_STEP);
+const LEVEL_FIELDS = [
+  { label: 'PEL', key: 'plannedEntryLevel' },
+  { label: 'CFL', key: 'clearedFlightLevel' },
+  { label: 'XFL', key: 'exitFlightLevel' },
+];
 
 let activeTrackPicker = null;
 
@@ -434,6 +442,13 @@ function createLabelNode(){
     if(!node.track) return;
     node.track.showType = !node.track.showType;
     updateLabelNode(node, node.track);
+  });
+
+  levels.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openLevelPicker(node, levels);
   });
 
   const handlePointerDown = evt=>{
@@ -1061,4 +1076,114 @@ function openVerticalPicker(node, anchor){
     });
     panel.appendChild(manual);
   });
+}
+
+function openLevelPicker(node, anchor){
+  if(!node || !anchor || !node.track) return;
+  const track = node.track;
+  showTrackPicker(node, anchor, 'track-picker--levels', (panel, _close)=>{
+    panel.dataset.type = 'levels';
+    const container = document.createElement('div');
+    container.className = 'track-picker__levels';
+    LEVEL_FIELDS.forEach(field=>{
+      container.appendChild(createLevelEditor(field, track, node));
+    });
+    panel.appendChild(container);
+    const hint = document.createElement('div');
+    hint.className = 'track-picker__hint';
+    hint.textContent = 'Only CFL changes the actual flight level.';
+    panel.appendChild(hint);
+  });
+}
+
+function createLevelEditor(field, track, node){
+  const row = document.createElement('div');
+  row.className = 'track-picker__level';
+  const label = document.createElement('span');
+  label.className = 'track-picker__level-label';
+  label.textContent = field.label;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = String(LEVEL_STEP);
+  input.min = String(LEVEL_MIN);
+  input.max = String(LEVEL_MAX);
+  input.placeholder = '---';
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'track-picker__clear';
+  clearBtn.textContent = 'Clear';
+
+  const refresh = ()=>{
+    const value = getTrackLevelValue(track, field.key);
+    if(value==null){
+      input.value = '';
+    }else{
+      input.value = String(value);
+    }
+  };
+
+  const commit = raw=>{
+    const trimmed = String(raw ?? '').trim();
+    if(!trimmed){
+      const hadValue = track[field.key]!=null;
+      if(hadValue){
+        track[field.key] = null;
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+      }
+      refresh();
+      return true;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if(Number.isNaN(parsed)){
+      return false;
+    }
+    const clamped = clampLevelValue(parsed);
+    const previous = getTrackLevelValue(track, field.key);
+    if(previous !== clamped || typeof track[field.key] !== 'number'){
+      track[field.key] = clamped;
+      track.labelRevision = (track.labelRevision || 0) + 1;
+      updateLabelNode(node, track);
+    }
+    refresh();
+    return true;
+  };
+
+  input.addEventListener('change', ()=>{
+    commit(input.value);
+  });
+  input.addEventListener('keydown', evt=>{
+    if(evt.key === 'Enter'){
+      evt.preventDefault();
+      commit(input.value);
+    }else if(evt.key === 'Escape'){
+      evt.preventDefault();
+      refresh();
+    }
+    evt.stopPropagation();
+  });
+  input.addEventListener('pointerdown', evt=>evt.stopPropagation());
+  clearBtn.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    input.value = '';
+    commit('');
+  });
+
+  refresh();
+  row.append(label, input, clearBtn);
+  return row;
+}
+
+function getTrackLevelValue(track, key){
+  if(!track) return null;
+  const value = track[key];
+  if(!Number.isFinite(value)) return null;
+  return Math.round(value);
+}
+
+function clampLevelValue(value){
+  if(!Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  return Math.min(Math.max(rounded, LEVEL_MIN), LEVEL_MAX);
 }
