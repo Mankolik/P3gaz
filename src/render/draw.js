@@ -40,9 +40,56 @@ export function drawFrame(canvas, camera, state, overlay){
         ctx.closePath(); ctx.stroke();
       }
     }else if(layer.type==='point'){
-      ctx.fillStyle = '#9ad1ff';
-      for(const f of layer.features){ if(f.x==null) continue;
-        ctx.beginPath(); ctx.arc(f.x, f.y, 2.5, 0, Math.PI*2); ctx.fill();
+      if(name==='WAYPOINTS'){
+        const invZoom = 1 / Math.max(camera.z, 1e-6);
+        const color = '#9c9c9c';
+        const symbolSize = 5 * invZoom;
+        const textOffset = 7 * invZoom;
+        const fontSize = 8 * invZoom;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1 * invZoom;
+        ctx.lineJoin = 'miter';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${fontSize}px "Inter", "Roboto", "Helvetica Neue", sans-serif`;
+        for(const f of layer.features){
+          const { x, y, props } = f || {};
+          if(x==null || y==null) continue;
+          const label = `${props?.name || ''}`.trim();
+          if(!label) continue;
+          ctx.beginPath();
+          ctx.moveTo(x, y - symbolSize);
+          ctx.lineTo(x + symbolSize, y + symbolSize);
+          ctx.lineTo(x - symbolSize, y + symbolSize);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.fillText(label, x + textOffset, y);
+        }
+        ctx.restore();
+      } else if(name==='AIRPORTS'){
+        const invZoom = 1 / Math.max(camera.z, 1e-6);
+        const color = '#ffffff';
+        const fontSize = 9 * invZoom;
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${fontSize}px "Inter", "Roboto", "Helvetica Neue", sans-serif`;
+        for(const f of layer.features){
+          const { x, y, props } = f || {};
+          if(x==null || y==null) continue;
+          const label = `${props?.icao || props?.name || ''}`.trim();
+          if(!label) continue;
+          ctx.fillText(label, x, y);
+        }
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#9ad1ff';
+        for(const f of layer.features){ if(f.x==null) continue;
+          ctx.beginPath(); ctx.arc(f.x, f.y, 2.5, 0, Math.PI*2); ctx.fill();
+        }
       }
     }
   }

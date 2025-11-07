@@ -103,6 +103,12 @@
       "type": "polygon"
     },
     {
+      "id": "waypoints_epww",
+      "path": "./assets/geojson/pl_enr4_4_waypoints.geojson",
+      "layer": "WAYPOINTS",
+      "type": "point"
+    },
+    {
       "id": "airports",
       "path": "./assets/geojson/airports_static.json",
       "layer": "AIRPORTS",
