@@ -339,6 +339,9 @@ function computeLevelDisplay(track){
 
   const figureSpace = ' ';
   const tokens = [];
+  const figureSpace = ' ';
+  let lastValue = null;
+  let suppressedCount = 0;
   let condensed = false;
   let suppressedCount = 0;
   let lastValue = hasAfl ? formattedValues[0] ?? null : null;
@@ -362,7 +365,6 @@ function computeLevelDisplay(track){
     tokens.push(value);
     lastValue = value;
   }
-
   flushSuppressed();
   const text = tokens.join(' ');
   return { text, tooltip, condensed, items };
