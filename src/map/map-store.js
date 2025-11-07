@@ -18,9 +18,12 @@ export function fitBounds(camera, container, bounds, pad=40){
   const w=container.clientWidth||800; const h=container.clientHeight||600;
   const width=Math.max(1e-3, maxX-minX);
   const height=Math.max(1e-3, maxY-minY);
-  const scaleX=(w-pad*2)/width;
-  const scaleY=(h-pad*2)/height;
-  const z=Math.max(0.1, Math.min(scaleX, scaleY));
+  const safeWidth=Math.max(1, w-pad*2);
+  const safeHeight=Math.max(1, h-pad*2);
+  const scaleX=safeWidth/width;
+  const scaleY=safeHeight/height;
+  const MIN_Z = 1e-4;
+  const z=Math.max(MIN_Z, Math.min(scaleX, scaleY));
   camera.z=z;
   camera.x=(minX+maxX)/2 - (w/(2*z));
   camera.y=(minY+maxY)/2 - (h/(2*z));
