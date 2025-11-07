@@ -53,15 +53,17 @@ export function drawTrackSymbols(ctx, camera, tracks){
     const rad = degToRad(track.heading);
     ctx.save();
     ctx.translate(track.x, track.y);
-    ctx.rotate(rad);
     ctx.lineWidth = invZoom / pixelScale;
     if(vecLength > 0){
+      ctx.save();
+      ctx.rotate(rad);
       const vectorColor = VECTOR_COLORS[track.status] || VECTOR_COLORS.default;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(vecLength, 0);
       ctx.strokeStyle = vectorColor;
       ctx.stroke();
+      ctx.restore();
     }
     ctx.beginPath();
     ctx.moveTo(0, -half);
@@ -156,20 +158,23 @@ function levelItemsFromTrack(track){
 
   const status = track.status || '';
   let primaryLevel = null;
-  if(status === 'inbound' || status === 'preinbound'){
+  const preferPel = status === 'inbound' || status === 'preinbound';
+  const forceCfl = status === 'accepted' || status === 'intruder' || status === 'unconcerned';
+
+  if(forceCfl){
+    if(track.clearedFlightLevel!=null){
+      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+    }
+  }else if(preferPel){
     if(track.plannedEntryLevel!=null){
       primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
+    }else if(track.clearedFlightLevel!=null){
+      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
     }
   }else if(track.clearedFlightLevel!=null){
     primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
-  }
-
-  if(!primaryLevel){
-    if(track.clearedFlightLevel!=null){
-      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
-    }else if(track.plannedEntryLevel!=null){
-      primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
-    }
+  }else if(track.plannedEntryLevel!=null){
+    primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
   }
 
   if(primaryLevel){
@@ -482,8 +487,12 @@ function positionLabel(node, track, screen){
   const labelY = screen.y + scaledOffsetY - height / 2;
   node.root.dataset.side = side;
   node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
-  const anchorX = side === 'left' ? labelX + width : labelX;
-  const anchorY = labelY + height / 2;
+  const rectLeft = labelX;
+  const rectRight = labelX + width;
+  const rectTop = labelY;
+  const rectBottom = labelY + height;
+  const anchorX = Math.min(Math.max(screen.x, rectLeft), rectRight);
+  const anchorY = Math.min(Math.max(screen.y, rectTop), rectBottom);
   node.lastScreen = { x: screen.x, y: screen.y, zoom };
   return { x: anchorX, y: anchorY };
 }
