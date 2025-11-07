@@ -17,6 +17,7 @@ const STATUS_STROKES = {
 const DEFAULT_SYMBOL_SIZE = 18;
 const DEFAULT_VECTOR_SCALE = 6;
 const CONNECTOR_COLOR = '#bfbfbf';
+const DEFAULT_LABEL_OFFSET = { x: 78, y: 0 };
 
 function degToRad(heading){
   const deg = Number.isFinite(heading) ? heading : 0;
@@ -87,6 +88,16 @@ export function drawTrackConnectors(ctx, projected, anchors){
   }
   ctx.stroke();
   ctx.restore();
+}
+
+function getLabelOffset(track){
+  if(!track || typeof track !== 'object'){
+    return { ...DEFAULT_LABEL_OFFSET };
+  }
+  const current = track.labelOffset || DEFAULT_LABEL_OFFSET;
+  const x = Number.isFinite(current.x) ? current.x : DEFAULT_LABEL_OFFSET.x;
+  const y = Number.isFinite(current.y) ? current.y : DEFAULT_LABEL_OFFSET.y;
+  return { x, y };
 }
 
 function createRow(className){
@@ -273,6 +284,8 @@ function createLabelNode(){
     needsMeasure: true,
     width: 0,
     height: 0,
+    dragState: null,
+    lastScreen: null,
   };
 
   speedToggle.addEventListener('click', evt=>{
@@ -289,6 +302,67 @@ function createLabelNode(){
     if(!node.track) return;
     node.track.showType = !node.track.showType;
     updateLabelNode(node, node.track);
+  });
+
+  const handlePointerDown = evt=>{
+    if(evt.button!==2 || !node.track) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    measureLabel(node);
+    node.dragState = {
+      pointerId: evt.pointerId,
+      lastX: evt.clientX,
+      lastY: evt.clientY,
+    };
+    node.root.classList.add('dragging');
+    node.root.setPointerCapture?.(evt.pointerId);
+  };
+
+  const handlePointerMove = evt=>{
+    const drag = node.dragState;
+    if(!drag || evt.pointerId !== drag.pointerId || !node.track) return;
+    const dx = evt.clientX - drag.lastX;
+    const dy = evt.clientY - drag.lastY;
+    if(dx===0 && dy===0) return;
+    drag.lastX = evt.clientX;
+    drag.lastY = evt.clientY;
+    const track = node.track;
+    const side = track.labelSide || 'left';
+    const offset = getLabelOffset(track);
+    const nextOffset = {
+      x: side === 'left' ? offset.x - dx : offset.x + dx,
+      y: offset.y + dy,
+    };
+    track.labelOffset = nextOffset;
+    const screen = node.lastScreen;
+    if(screen){
+      const width = node.width;
+      const height = node.height;
+      const labelX = side === 'left'
+        ? screen.x - nextOffset.x - width
+        : screen.x + nextOffset.x;
+      const labelY = screen.y + nextOffset.y - height / 2;
+      node.root.dataset.side = side;
+      node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
+    }
+  };
+
+  const endDrag = evt=>{
+    const drag = node.dragState;
+    if(!drag || evt.pointerId !== drag.pointerId) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    node.dragState = null;
+    node.root.classList.remove('dragging');
+    node.root.releasePointerCapture?.(evt.pointerId);
+  };
+
+  node.root.addEventListener('pointerdown', handlePointerDown);
+  node.root.addEventListener('pointermove', handlePointerMove);
+  node.root.addEventListener('pointerup', endDrag);
+  node.root.addEventListener('pointercancel', endDrag);
+  node.root.addEventListener('contextmenu', evt=>{
+    evt.preventDefault();
   });
 
   return node;
@@ -370,7 +444,7 @@ function measureLabel(node){
 
 function positionLabel(node, track, screen){
   measureLabel(node);
-  const overlayOffset = track.labelOffset || { x: 78, y: 0 };
+  const overlayOffset = getLabelOffset(track);
   const side = track.labelSide || 'left';
   const width = node.width;
   const height = node.height;
@@ -383,6 +457,7 @@ function positionLabel(node, track, screen){
   node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
   const anchorX = side === 'left' ? labelX + width : labelX;
   const anchorY = labelY + height / 2;
+  node.lastScreen = { x: screen.x, y: screen.y };
   return { x: anchorX, y: anchorY };
 }
 
