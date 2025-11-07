@@ -100,8 +100,10 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-picker--vertical .track-picker__options{ max-height:140px; }
 .track-picker__manual .track-picker__clear{ background:#181f2a; }
 .track-picker__levels{ display:flex; flex-direction:column; gap:8px; }
-.track-picker__level{ display:flex; align-items:center; gap:8px; }
+.track-picker__level{ display:flex; flex-direction:column; gap:6px; }
+.track-picker__level-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .track-picker__level-label{ min-width:36px; font-weight:600; letter-spacing:.5px; }
+.track-picker__level .track-picker__options{ max-height:140px; }
 .track-picker__level input{ flex:1; background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 6px; color:inherit; font-size:12px; }
 .track-picker__hint{ font-size:11px; color:var(--text-dim); margin-top:4px; }
 

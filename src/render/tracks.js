@@ -54,6 +54,9 @@ const LEVEL_FIELDS = [
   { label: 'CFL', key: 'clearedFlightLevel' },
   { label: 'XFL', key: 'exitFlightLevel' },
 ];
+const LEVEL_OPTIONS = Array.from({
+  length: Math.floor((LEVEL_MAX - LEVEL_MIN) / LEVEL_STEP) + 1,
+}, (_, index)=>LEVEL_MIN + index * LEVEL_STEP);
 
 let activeTrackPicker = null;
 
@@ -325,19 +328,34 @@ function computeLevelDisplay(track){
   const items = levelItemsFromTrack(track);
   if(items.length===0) return { text:'', tooltip:'', condensed:false, items };
   const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
-  const displayItems = items.filter(item=>item.label !== 'AFL');
-  if(displayItems.length===0){
-    return { text:'', tooltip, condensed:false, items };
-  }
-  const rawValues = displayItems.map(item=>formatFlightLevel(item.value));
-  const displayValues = [];
-  for(const value of rawValues){
-    if(displayValues.length===0 || displayValues[displayValues.length-1] !== value){
-      displayValues.push(value);
+  const formattedValues = items.map(item=>formatFlightLevel(item.value));
+  const tokens = [];
+  let lastValue = null;
+  let suppressedCount = 0;
+  let condensed = false;
+  const flushSuppressed = ()=>{
+    if(suppressedCount>0){
+      tokens.push(''.padEnd(suppressedCount * 3, ' '));
+      suppressedCount = 0;
     }
+  };
+  for(const value of formattedValues){
+    if(tokens.length===0){
+      tokens.push(value);
+      lastValue = value;
+      continue;
+    }
+    if(value === lastValue){
+      condensed = true;
+      suppressedCount += 1;
+      continue;
+    }
+    flushSuppressed();
+    tokens.push(value);
+    lastValue = value;
   }
-  const condensed = displayValues.length < rawValues.length;
-  return { text: displayValues.join(' '), tooltip, condensed, items };
+  const text = tokens.join(' ');
+  return { text, tooltip, condensed, items };
 }
 
 function updateLevelSegments(node, track, items){
@@ -687,7 +705,7 @@ function updateLabelNode(node, track){
   node.levelsDisplay.textContent = levelDisplay.text;
   node.levels.dataset.mode = levelDisplay.condensed ? 'condensed' : 'full';
   node.levels.title = levelDisplay.tooltip;
-  const hasDisplayLevels = levelDisplay.items?.some(item=>item.label !== 'AFL');
+  const hasDisplayLevels = (levelDisplay.text || '').trim().length > 0;
   node.levels.classList.toggle('muted', !hasDisplayLevels);
   updateLevelSegments(node, track, levelDisplay.items || []);
 
@@ -1184,12 +1202,12 @@ function openVerticalPicker(node, anchor){
 function openLevelPicker(node, anchor){
   if(!node || !anchor || !node.track) return;
   const track = node.track;
-  showTrackPicker(node, anchor, 'track-picker--levels', (panel, _close)=>{
+  showTrackPicker(node, anchor, 'track-picker--levels', (panel, close)=>{
     panel.dataset.type = 'levels';
     const container = document.createElement('div');
     container.className = 'track-picker__levels';
     LEVEL_FIELDS.forEach(field=>{
-      container.appendChild(createLevelEditor(field, track, node));
+      container.appendChild(createLevelEditor(field, track, node, close, { closeOnSelect: false }));
     });
     panel.appendChild(container);
     const hint = document.createElement('div');
@@ -1202,11 +1220,11 @@ function openLevelPicker(node, anchor){
 function openSingleLevelPicker(node, anchor, field){
   if(!node || !anchor || !node.track || !field || !field.key) return;
   const track = node.track;
-  showTrackPicker(node, anchor, 'track-picker--levels', (panel, _close)=>{
+  showTrackPicker(node, anchor, 'track-picker--levels', (panel, close)=>{
     panel.dataset.type = 'levels-single';
     const container = document.createElement('div');
     container.className = 'track-picker__levels';
-    container.appendChild(createLevelEditor({ label: field.label || field.key, key: field.key }, track, node));
+    container.appendChild(createLevelEditor({ label: field.label || field.key, key: field.key }, track, node, close, { closeOnSelect: true }));
     panel.appendChild(container);
   });
 }
@@ -1215,34 +1233,51 @@ function openEclPicker(node, anchor){
   openSingleLevelPicker(node, anchor, { label: 'ECL', key: 'expectedCruiseLevel' });
 }
 
-function createLevelEditor(field, track, node){
+function createLevelEditor(field, track, node, close, options){
   const row = document.createElement('div');
   row.className = 'track-picker__level';
+  const header = document.createElement('div');
+  header.className = 'track-picker__level-header';
   const label = document.createElement('span');
   label.className = 'track-picker__level-label';
   label.textContent = field.label;
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'track-picker__clear';
+  clearBtn.textContent = 'Clear';
+  header.append(label, clearBtn);
+
+  const list = document.createElement('div');
+  list.className = 'track-picker__options track-picker__options--level';
+  const manual = document.createElement('div');
+  manual.className = 'track-picker__manual';
   const input = document.createElement('input');
   input.type = 'number';
   input.step = String(LEVEL_STEP);
   input.min = String(LEVEL_MIN);
   input.max = String(LEVEL_MAX);
-  input.placeholder = '---';
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.className = 'track-picker__clear';
-  clearBtn.textContent = 'Clear';
+  input.placeholder = 'Manual level';
+  input.title = 'Press Enter to apply';
+  manual.appendChild(input);
+
+  const closeOnSelect = options?.closeOnSelect === true;
 
   const refresh = ()=>{
-    const value = getTrackLevelValue(track, field.key);
-    if(value==null){
+    const current = getTrackLevelValue(track, field.key);
+    const buttons = list.querySelectorAll('.track-picker__option');
+    buttons.forEach(btn=>{
+      const value = Number.parseInt(btn.dataset.value || '', 10);
+      btn.classList.toggle('selected', current!=null && value === current);
+    });
+    if(current==null){
       input.value = '';
     }else{
-      input.value = String(value);
+      input.value = String(current);
     }
   };
 
-  const commit = raw=>{
-    const trimmed = String(raw ?? '').trim();
+  const applyValue = raw=>{
+    const trimmed = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim();
     if(!trimmed){
       const hadValue = track[field.key]!=null;
       if(hadValue){
@@ -1253,8 +1288,8 @@ function createLevelEditor(field, track, node){
       refresh();
       return true;
     }
-    const parsed = parseInt(trimmed, 10);
-    if(Number.isNaN(parsed)){
+    const parsed = Number.parseInt(trimmed, 10);
+    if(!Number.isFinite(parsed)){
       return false;
     }
     const clamped = clampLevelValue(parsed);
@@ -1268,13 +1303,34 @@ function createLevelEditor(field, track, node){
     return true;
   };
 
+  LEVEL_OPTIONS.forEach(value=>{
+    const option = createPickerOption(formatFlightLevel(value), false);
+    option.dataset.value = String(value);
+    option.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      const applied = applyValue(value);
+      if(applied && closeOnSelect && typeof close === 'function'){
+        close();
+      }
+    });
+    list.appendChild(option);
+  });
+
   input.addEventListener('change', ()=>{
-    commit(input.value);
+    if(!applyValue(input.value)){
+      refresh();
+    }else if(closeOnSelect && typeof close === 'function'){
+      close();
+    }
   });
   input.addEventListener('keydown', evt=>{
     if(evt.key === 'Enter'){
       evt.preventDefault();
-      commit(input.value);
+      const applied = applyValue(input.value);
+      if(applied && closeOnSelect && typeof close === 'function'){
+        close();
+      }
     }else if(evt.key === 'Escape'){
       evt.preventDefault();
       refresh();
@@ -1285,12 +1341,14 @@ function createLevelEditor(field, track, node){
   clearBtn.addEventListener('click', evt=>{
     evt.preventDefault();
     evt.stopPropagation();
-    input.value = '';
-    commit('');
+    const applied = applyValue('');
+    if(applied && closeOnSelect && typeof close === 'function'){
+      close();
+    }
   });
 
+  row.append(header, list, manual);
   refresh();
-  row.append(label, input, clearBtn);
   return row;
 }
 
