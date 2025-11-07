@@ -1,3 +1,9 @@
+import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
+
+const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
+const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
+const ZERO_WIND = { speed: 0, direction: 0 };
+
 function toRadians(deg){
   return (Number.isFinite(deg) ? deg : 0) * Math.PI / 180;
 }
@@ -59,8 +65,11 @@ function advanceTrack(track, dtSeconds, project){
     track.vectorDy = 0;
     return;
   }
-  const speed = Number.isFinite(track.groundSpeed) ? Math.max(track.groundSpeed, 0) : 0;
   const heading = normalizeHeading(track.heading);
+  const nextHeading = updateHeading(track, heading, dtSeconds);
+  track.heading = nextHeading;
+
+  const speed = updateGroundSpeed(track, dtSeconds, nextHeading);
   const lon = track.lon;
   const lat = track.lat;
 
@@ -68,7 +77,7 @@ function advanceTrack(track, dtSeconds, project){
   let nextLon = lon;
   let nextLat = lat;
   if(distanceNm > 0){
-    const next = propagatePosition(lon, lat, heading, distanceNm);
+    const next = propagatePosition(lon, lat, nextHeading, distanceNm);
     nextLon = next.lon;
     nextLat = next.lat;
   }
@@ -106,5 +115,74 @@ function updateTrackVector(track, project){
   const futureProjected = projectPosition(project, future.lon, future.lat, { x: track.x ?? 0, y: track.y ?? 0 });
   track.vectorDx = futureProjected.x - (track.x ?? 0);
   track.vectorDy = futureProjected.y - (track.y ?? 0);
+}
+
+function updateHeading(track, currentHeading, dtSeconds){
+  if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
+    return currentHeading;
+  }
+  const target = Number.isFinite(track?.assignedHeading) ? normalizeHeading(track.assignedHeading) : null;
+  if(target==null){
+    return currentHeading;
+  }
+  const delta = shortestHeadingDelta(currentHeading, target);
+  if(delta === 0){
+    return target;
+  }
+  const maxChange = RATE_ONE_DEG_PER_SECOND * dtSeconds;
+  if(Math.abs(delta) <= maxChange){
+    return target;
+  }
+  return normalizeHeading(currentHeading + Math.sign(delta) * maxChange);
+}
+
+function shortestHeadingDelta(current, target){
+  const normCurrent = normalizeHeading(current);
+  const normTarget = normalizeHeading(target);
+  let delta = normTarget - normCurrent;
+  delta = ((delta + 540) % 360) - 180;
+  return delta;
+}
+
+function updateGroundSpeed(track, dtSeconds, heading){
+  const currentSpeed = Number.isFinite(track?.groundSpeed) ? Math.max(track.groundSpeed, 0) : 0;
+  const assigned = track?.assignedSpeed;
+  const target = calculateTargetGroundSpeed(track, assigned, heading);
+  if(target==null || !Number.isFinite(target)){
+    return currentSpeed;
+  }
+  if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
+    const clamped = Math.max(0, target);
+    track.groundSpeed = clamped;
+    return clamped;
+  }
+  const rate = Number.isFinite(track?.speedChangeRate) ? Math.max(track.speedChangeRate, 0) : DEFAULT_SPEED_CHANGE_RATE;
+  const maxDelta = rate * dtSeconds;
+  const diff = target - currentSpeed;
+  if(Math.abs(diff) <= maxDelta){
+    track.groundSpeed = Math.max(0, target);
+    return track.groundSpeed;
+  }
+  const next = currentSpeed + Math.sign(diff) * maxDelta;
+  track.groundSpeed = Math.max(0, next);
+  return track.groundSpeed;
+}
+
+function calculateTargetGroundSpeed(track, assigned, heading){
+  if(!assigned || assigned.value==null || Number.isNaN(assigned.value)){
+    return null;
+  }
+  const altitudeSource = Number.isFinite(track?.actualFlightLevel)
+    ? track.actualFlightLevel
+    : Number.isFinite(track?.clearedFlightLevel)
+      ? track.clearedFlightLevel
+      : Number.isFinite(track?.plannedEntryLevel)
+        ? track.plannedEntryLevel
+        : Number.isFinite(track?.exitFlightLevel)
+          ? track.exitFlightLevel
+          : 0;
+  const altitudeFt = Number.isFinite(altitudeSource) ? altitudeSource * 100 : 0;
+  const wind = track?.wind || ZERO_WIND;
+  return calculateGroundSpeedFromInstruction(assigned, altitudeFt, heading, wind);
 }
 

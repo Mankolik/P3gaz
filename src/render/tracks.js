@@ -1,3 +1,5 @@
+import { parseSpeedInstruction } from '../utils/speed.js';
+
 const STATUS_COLORS = {
   default: '#bfbfbf',
   accepted: '#00FF55',
@@ -25,10 +27,38 @@ const VECTOR_COLORS = {
   default: '#bfbfbf',
 };
 const DEFAULT_LABEL_OFFSET = { x: 78, y: 0 };
+const HEADING_STEP = 5;
+const IAS_SPEED_MIN = 120;
+const IAS_SPEED_MAX = 480;
+const IAS_SPEED_STEP = 10;
+const MACH_SPEED_MIN = 0.30;
+const MACH_SPEED_MAX = 0.90;
+const MACH_SPEED_STEP = 0.01;
+const VERTICAL_RATE_MIN = -4000;
+const VERTICAL_RATE_MAX = 4000;
+const VERTICAL_RATE_STEP = 500;
+const MACH_LABEL_PRECISION = 2;
+
+const HEADING_OPTIONS = Array.from({ length: Math.floor(360 / HEADING_STEP) }, (_, index)=>index * HEADING_STEP);
+const IAS_SPEED_OPTIONS = Array.from({ length: Math.floor((IAS_SPEED_MAX - IAS_SPEED_MIN) / IAS_SPEED_STEP) + 1 },
+  (_, index)=>IAS_SPEED_MIN + index * IAS_SPEED_STEP);
+const MACH_SPEED_OPTIONS = Array.from({ length: Math.floor((MACH_SPEED_MAX - MACH_SPEED_MIN) / MACH_SPEED_STEP) + 1 },
+  (_, index)=>Number((MACH_SPEED_MIN + index * MACH_SPEED_STEP).toFixed(MACH_LABEL_PRECISION)));
+const VERTICAL_RATE_OPTIONS = Array.from({ length: Math.floor((VERTICAL_RATE_MAX - VERTICAL_RATE_MIN) / VERTICAL_RATE_STEP) + 1 },
+  (_, index)=>VERTICAL_RATE_MIN + index * VERTICAL_RATE_STEP);
+
+let activeTrackPicker = null;
 
 function degToRad(heading){
   const deg = Number.isFinite(heading) ? heading : 0;
   return (deg - 90) * Math.PI / 180;
+}
+
+function nowMs(){
+  if(typeof performance !== 'undefined' && typeof performance.now === 'function'){
+    return performance.now();
+  }
+  return Date.now();
 }
 
 export function drawTrackSymbols(ctx, camera, tracks){
@@ -143,6 +173,90 @@ function formatHeading(hdg){
   if(hdg==null || Number.isNaN(hdg)) return 'h';
   const norm = Math.round(((hdg % 360) + 360) % 360);
   return `${norm.toString().padStart(3, '0')}°`;
+}
+
+function normalizeSpeedAssignment(track){
+  const existing = track?.assignedSpeed;
+  const modeHint = existing && typeof existing === 'object' && existing.mode ? existing.mode : 'IAS';
+  const parsed = parseSpeedInstruction(existing, modeHint);
+  const mode = parsed.mode === 'Mach' ? 'Mach' : 'IAS';
+  let value = parsed.value;
+  if(!Number.isFinite(value)){
+    value = null;
+  }else if(mode === 'Mach'){
+    value = Number(Math.min(Math.max(value, MACH_SPEED_MIN), MACH_SPEED_MAX).toFixed(MACH_LABEL_PRECISION));
+  }else{
+    value = Math.round(Math.min(Math.max(value, IAS_SPEED_MIN), IAS_SPEED_MAX));
+  }
+  const normalized = { mode, value };
+  track.assignedSpeed = normalized;
+  return normalized;
+}
+
+function formatAssignedSpeedDisplay(assignment){
+  if(!assignment || assignment.value==null || Number.isNaN(assignment.value)){
+    return '';
+  }
+  const mode = String(assignment.mode || 'IAS').toUpperCase().startsWith('M') ? 'Mach' : 'IAS';
+  if(mode === 'Mach'){
+    const mach = Number(assignment.value);
+    if(!Number.isFinite(mach)) return '';
+    const hundredths = Math.round(mach * 100).toString().padStart(2, '0');
+    return `M${hundredths} (Mach ${mach.toFixed(2)})`;
+  }
+  const knots = Math.round(Number(assignment.value));
+  if(!Number.isFinite(knots) || knots <= 0) return '';
+  const tens = Math.round(knots / 10).toString().padStart(2, '0');
+  return `N${tens} (${knots}kt)`;
+}
+
+function normalizeVerticalAssignment(track, preserveFlag=false){
+  const assignment = track?.assignedVertical;
+  if(!assignment || typeof assignment !== 'object'){
+    track.assignedVertical = null;
+    if(!preserveFlag){
+      track.verticalRateAssigned = false;
+    }
+    return null;
+  }
+  const rawValue = Number(assignment.value);
+  if(!Number.isFinite(rawValue)){
+    track.assignedVertical = null;
+    if(!preserveFlag){
+      track.verticalRateAssigned = false;
+    }
+    return null;
+  }
+  const comparator = assignment.comparator === 'or-greater'
+    ? 'or-greater'
+    : assignment.comparator === 'or-less'
+      ? 'or-less'
+      : 'exact';
+  const value = Math.round(Math.max(Math.min(rawValue, 6000), -6000));
+  const normalized = { value, comparator };
+  track.assignedVertical = normalized;
+  track.verticalRateAssigned = true;
+  return normalized;
+}
+
+function clearVerticalAssignment(track){
+  track.assignedVertical = null;
+  track.verticalRateAssigned = false;
+}
+
+function formatAssignedVerticalDisplay(assignment){
+  if(!assignment || assignment.value==null || Number.isNaN(assignment.value)){
+    return '';
+  }
+  const magnitude = Math.round(Math.abs(assignment.value));
+  const prefix = assignment.value > 0 ? '+' : assignment.value < 0 ? '-' : '';
+  let display = magnitude === 0 ? '0' : `${prefix}${magnitude}`;
+  if(assignment.comparator === 'or-greater'){
+    display += '+';
+  }else if(assignment.comparator === 'or-less'){
+    display += '-';
+  }
+  return display;
 }
 
 function levelItemsFromTrack(track){
@@ -300,6 +414,10 @@ function createLabelNode(){
     height: 0,
     dragState: null,
     lastScreen: null,
+    activePicker: null,
+    lastGroundSpeed: null,
+    lastVerticalSpeed: null,
+    lastMetricsUpdate: 0,
   };
 
   speedToggle.addEventListener('click', evt=>{
@@ -385,6 +503,27 @@ function createLabelNode(){
     evt.preventDefault();
   });
 
+  node.assignedHeading.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openHeadingPicker(node, node.assignedHeading);
+  });
+
+  node.assignedSpeed.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openSpeedPicker(node, node.assignedSpeed);
+  });
+
+  node.assignedVertical.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openVerticalPicker(node, node.assignedVertical);
+  });
+
   return node;
 }
 
@@ -415,7 +554,7 @@ function updateLabelNode(node, track){
   let speedLabel = null;
   if(showGs){
     const groundSpeed = formatGroundSpeed(track.groundSpeed);
-    speedLabel = groundSpeed === '---' ? groundSpeed : `${groundSpeed}KT`;
+    speedLabel = groundSpeed;
   }else{
     speedLabel = formatVerticalSpeed(track.verticalSpeed);
   }
@@ -443,22 +582,40 @@ function updateLabelNode(node, track){
   node.wake.textContent = track.wake || '-';
   node.destination.textContent = track.destination || track.exitPoint || '----';
 
+  const speedAssignment = normalizeSpeedAssignment(track);
+  const verticalAssignment = normalizeVerticalAssignment(track, true);
+
   const headingValue = formatHeading(track.assignedHeading);
   node.assignedHeading.textContent = headingValue;
   node.assignedHeading.dataset.empty = headingValue === 'h';
+  node.assignedHeading.title = headingValue === 'h' ? '' : headingValue;
 
-  const speedValue = track.assignedSpeed || 's';
-  node.assignedSpeed.textContent = speedValue;
-  node.assignedSpeed.dataset.empty = speedValue === 's';
+  const speedValue = formatAssignedSpeedDisplay(speedAssignment);
+  node.assignedSpeed.textContent = speedValue || 's';
+  node.assignedSpeed.dataset.empty = !speedValue;
+  node.assignedSpeed.dataset.mode = speedAssignment?.mode === 'Mach' ? 'mach' : 'ias';
+  node.assignedSpeed.title = speedValue || '';
 
-  const verticalValue = track.verticalRateAssigned ? 'R' : 'r';
-  node.assignedVertical.textContent = verticalValue;
-  node.assignedVertical.dataset.empty = verticalValue === 'r';
+  const verticalValue = formatAssignedVerticalDisplay(verticalAssignment);
+  const hasVerticalAssignment = track.verticalRateAssigned && !!verticalAssignment;
+  node.assignedVertical.textContent = track.verticalRateAssigned ? 'R' : 'r';
+  node.assignedVertical.dataset.empty = !track.verticalRateAssigned;
+  node.assignedVertical.dataset.mode = hasVerticalAssignment
+    ? (verticalAssignment?.comparator || 'exact')
+    : (track.verticalRateAssigned ? 'pending' : 'exact');
+  node.assignedVertical.dataset.value = verticalValue || '';
+  node.assignedVertical.title = track.verticalRateAssigned
+    ? (verticalValue ? `${verticalValue} FPM` : 'Rate assigned')
+    : '';
 
   const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
   node.ecl.dataset.empty = eclValue === '--';
   node.needsMeasure = true;
+
+  node.lastGroundSpeed = Number.isFinite(track.groundSpeed) ? Math.round(track.groundSpeed) : null;
+  node.lastVerticalSpeed = Number.isFinite(track.verticalSpeed) ? Math.round(track.verticalSpeed) : null;
+  node.lastMetricsUpdate = nowMs();
 }
 
 function measureLabel(node){
@@ -510,7 +667,7 @@ export function syncTrackLabels(overlay, projected){
       updateLabelNode(node, track);
     }else{
       const revision = getTrackRevision(track);
-      if(node.track !== track || node.revision !== revision){
+      if(node.track !== track || node.revision !== revision || shouldRefreshMetrics(node, track)){
         updateLabelNode(node, track);
       }
     }
@@ -519,9 +676,389 @@ export function syncTrackLabels(overlay, projected){
   }
   for(const [id, node] of cache){
     if(!nextIds.has(id)){
+      if(activeTrackPicker?.node === node){
+        closeActivePicker();
+      }
       overlay.removeChild(node.root);
       cache.delete(id);
     }
   }
   return anchors;
+}
+
+function closeActivePicker(){
+  if(!activeTrackPicker) return;
+  document.removeEventListener('pointerdown', activeTrackPicker.handlePointerDown, true);
+  document.removeEventListener('keydown', activeTrackPicker.handleKeyDown, true);
+  activeTrackPicker.panel?.remove();
+  if(activeTrackPicker.node){
+    activeTrackPicker.node.activePicker = null;
+  }
+  activeTrackPicker = null;
+}
+
+function shouldRefreshMetrics(node, track){
+  if(!node || !track) return false;
+  const now = nowMs();
+  const elapsed = now - (node.lastMetricsUpdate || 0);
+  const ground = Number.isFinite(track.groundSpeed) ? Math.round(track.groundSpeed) : null;
+  const vertical = Number.isFinite(track.verticalSpeed) ? Math.round(track.verticalSpeed) : null;
+  if(node.lastGroundSpeed !== ground || node.lastVerticalSpeed !== vertical){
+    return true;
+  }
+  return elapsed >= 3000;
+}
+
+function showTrackPicker(node, anchor, className, build){
+  if(!node || !anchor || typeof build !== 'function') return;
+  closeActivePicker();
+  const panel = document.createElement('div');
+  panel.className = `track-picker${className ? ` ${className}` : ''}`;
+  panel.dataset.trackId = node.track?.id || '';
+  panel.style.position = 'fixed';
+  panel.style.zIndex = '12000';
+  const close = ()=>closeActivePicker();
+  build(panel, close);
+  document.body.appendChild(panel);
+  positionTrackPicker(panel, anchor);
+  panel.focus?.();
+  const handlePointerDown = evt=>{
+    if(panel.contains(evt.target) || anchor.contains(evt.target)) return;
+    closeActivePicker();
+  };
+  const handleKeyDown = evt=>{
+    if(evt.key === 'Escape'){
+      closeActivePicker();
+    }
+  };
+  document.addEventListener('pointerdown', handlePointerDown, true);
+  document.addEventListener('keydown', handleKeyDown, true);
+  activeTrackPicker = { panel, node, anchor, handlePointerDown, handleKeyDown };
+  node.activePicker = panel;
+}
+
+function positionTrackPicker(panel, anchor){
+  if(!panel || !anchor) return;
+  const anchorRect = anchor.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const margin = 8;
+  let left = anchorRect.left;
+  let top = anchorRect.bottom + 6;
+  if(left + panelRect.width > window.innerWidth - margin){
+    left = window.innerWidth - panelRect.width - margin;
+  }
+  if(top + panelRect.height > window.innerHeight - margin){
+    top = Math.max(margin, anchorRect.top - panelRect.height - 6);
+  }
+  left = Math.max(margin, left);
+  top = Math.max(margin, top);
+  panel.style.left = `${Math.round(left)}px`;
+  panel.style.top = `${Math.round(top)}px`;
+}
+
+function createPickerOption(label, selected){
+  const option = document.createElement('button');
+  option.type = 'button';
+  option.className = 'track-picker__option';
+  option.textContent = label;
+  if(selected) option.classList.add('selected');
+  return option;
+}
+
+function createManualInput(options){
+  const { placeholder, type, step, min, max, defaultValue, onSubmit, onClear, close } = options || {};
+  const container = document.createElement('div');
+  container.className = 'track-picker__manual';
+  const input = document.createElement('input');
+  input.type = type || 'text';
+  if(step!=null) input.step = String(step);
+  if(min!=null) input.min = String(min);
+  if(max!=null) input.max = String(max);
+  if(placeholder) input.placeholder = placeholder;
+  input.title = 'Press Enter to apply';
+  if(defaultValue!=null && defaultValue!==''){
+    input.value = defaultValue;
+  }
+  container.appendChild(input);
+  const handleSubmit = ()=>{
+    if(typeof onSubmit !== 'function'){
+      if(typeof close === 'function') close();
+      return;
+    }
+    const result = onSubmit(input.value);
+    if(result !== false && typeof close === 'function'){
+      close();
+    }
+  };
+  input.addEventListener('keydown', evt=>{
+    if(evt.key === 'Enter'){
+      evt.preventDefault();
+      handleSubmit();
+    }
+    evt.stopPropagation();
+  });
+  if(typeof onClear === 'function'){
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'track-picker__clear';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      input.value = '';
+      onClear();
+      if(typeof close === 'function') close();
+    });
+    container.appendChild(clearBtn);
+  }
+  return container;
+}
+
+function formatVerticalOption(value){
+  if(value === 0) return '0';
+  const sign = value > 0 ? '+' : '-';
+  return `${sign}${Math.abs(value)}`;
+}
+
+function openHeadingPicker(node, anchor){
+  if(!node || !anchor || !node.track) return;
+  const track = node.track;
+  const selected = Number.isFinite(track.assignedHeading)
+    ? ((track.assignedHeading % 360) + 360) % 360
+    : null;
+  showTrackPicker(node, anchor, 'track-picker--heading', (panel, close)=>{
+    panel.dataset.type = 'heading';
+    const list = document.createElement('div');
+    list.className = 'track-picker__options';
+    HEADING_OPTIONS.forEach(value=>{
+      const option = createPickerOption(formatHeading(value), selected!=null && selected === value);
+      option.addEventListener('click', evt=>{
+        evt.preventDefault();
+        evt.stopPropagation();
+        track.assignedHeading = value;
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+        close();
+      });
+      list.appendChild(option);
+    });
+    panel.appendChild(list);
+    const manual = createManualInput({
+      placeholder: 'Manual heading',
+      type: 'number',
+      min: 0,
+      max: 359,
+      step: 1,
+      defaultValue: Number.isFinite(track.assignedHeading) ? String(Math.round(((track.assignedHeading % 360) + 360) % 360)) : '',
+      onSubmit: raw=>{
+        const parsed = parseInt(raw, 10);
+        if(!Number.isFinite(parsed)) return false;
+        const normalized = ((parsed % 360) + 360) % 360;
+        track.assignedHeading = normalized;
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+        return true;
+      },
+      onClear: ()=>{
+        track.assignedHeading = null;
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+      },
+      close,
+    });
+    panel.appendChild(manual);
+  });
+}
+
+function openSpeedPicker(node, anchor){
+  if(!node || !anchor || !node.track) return;
+  const track = node.track;
+  const assignment = normalizeSpeedAssignment(track);
+  const mode = assignment.mode === 'Mach' ? 'Mach' : 'IAS';
+  const selectedValue = Number.isFinite(assignment.value) ? assignment.value : null;
+  showTrackPicker(node, anchor, 'track-picker--speed', (panel, close)=>{
+    panel.dataset.type = 'speed';
+    const modes = document.createElement('div');
+    modes.className = 'track-picker__mode-toggle';
+    const iasBtn = document.createElement('button');
+    iasBtn.type = 'button';
+    iasBtn.textContent = 'IAS';
+    const machBtn = document.createElement('button');
+    machBtn.type = 'button';
+    machBtn.textContent = 'MN';
+    const updateModeButtons = ()=>{
+      iasBtn.classList.toggle('active', mode !== 'Mach');
+      machBtn.classList.toggle('active', mode === 'Mach');
+    };
+    updateModeButtons();
+    iasBtn.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      if(mode === 'IAS') return;
+      track.assignedSpeed = { mode: 'IAS', value: null };
+      track.labelRevision = (track.labelRevision || 0) + 1;
+      updateLabelNode(node, track);
+      close();
+      requestAnimationFrame(()=>openSpeedPicker(node, anchor));
+    });
+    machBtn.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      if(mode === 'Mach') return;
+      track.assignedSpeed = { mode: 'Mach', value: null };
+      track.labelRevision = (track.labelRevision || 0) + 1;
+      updateLabelNode(node, track);
+      close();
+      requestAnimationFrame(()=>openSpeedPicker(node, anchor));
+    });
+    modes.append(iasBtn, machBtn);
+    panel.appendChild(modes);
+
+    const list = document.createElement('div');
+    list.className = 'track-picker__options';
+    const values = mode === 'Mach' ? MACH_SPEED_OPTIONS : IAS_SPEED_OPTIONS;
+    values.forEach(value=>{
+      const label = mode === 'Mach' ? value.toFixed(MACH_LABEL_PRECISION) : String(value);
+      const selected = selectedValue!=null && (mode === 'Mach'
+        ? Math.abs(value - selectedValue) < 1e-3
+        : Math.abs(value - selectedValue) < 0.5);
+      const option = createPickerOption(label, selected);
+      option.addEventListener('click', evt=>{
+        evt.preventDefault();
+        evt.stopPropagation();
+        track.assignedSpeed = { mode, value: mode === 'Mach' ? Number(value.toFixed(MACH_LABEL_PRECISION)) : value };
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+        close();
+      });
+      list.appendChild(option);
+    });
+    panel.appendChild(list);
+
+    const manual = createManualInput({
+      placeholder: mode === 'Mach' ? '0.78' : '250',
+      type: 'number',
+      step: mode === 'Mach' ? '0.01' : '10',
+      min: mode === 'Mach' ? MACH_SPEED_MIN : IAS_SPEED_MIN,
+      max: mode === 'Mach' ? MACH_SPEED_MAX : IAS_SPEED_MAX,
+      defaultValue: selectedValue!=null
+        ? (mode === 'Mach' ? selectedValue.toFixed(MACH_LABEL_PRECISION) : String(selectedValue))
+        : '',
+      onSubmit: raw=>{
+        if(mode === 'Mach'){
+          let parsed = parseFloat(raw);
+          if(Number.isNaN(parsed)) return false;
+          if(parsed >= 10) parsed /= 100;
+          parsed = Math.min(Math.max(parsed, MACH_SPEED_MIN), MACH_SPEED_MAX);
+          track.assignedSpeed = { mode, value: Number(parsed.toFixed(MACH_LABEL_PRECISION)) };
+        }else{
+          let parsed = parseFloat(raw);
+          if(Number.isNaN(parsed)) return false;
+          parsed = Math.round(parsed);
+          parsed = Math.min(Math.max(parsed, IAS_SPEED_MIN), IAS_SPEED_MAX);
+          track.assignedSpeed = { mode, value: parsed };
+        }
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+        return true;
+      },
+      onClear: ()=>{
+        track.assignedSpeed = { mode, value: null };
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+      },
+      close,
+    });
+    panel.appendChild(manual);
+  });
+}
+
+function openVerticalPicker(node, anchor){
+  if(!node || !anchor || !node.track) return;
+  const track = node.track;
+  const assignment = normalizeVerticalAssignment(track, true);
+  let comparator = assignment?.comparator || 'exact';
+  let selectedValue = Number.isFinite(assignment?.value) ? assignment.value : null;
+  showTrackPicker(node, anchor, 'track-picker--vertical', (panel, close)=>{
+    panel.dataset.type = 'vertical';
+    const controls = document.createElement('div');
+    controls.className = 'track-picker__controls';
+    const plusBtn = document.createElement('button');
+    plusBtn.type = 'button';
+    plusBtn.textContent = '+';
+    const minusBtn = document.createElement('button');
+    minusBtn.type = 'button';
+    minusBtn.textContent = '-';
+    function updateComparatorButtons(){
+      plusBtn.classList.toggle('active', comparator === 'or-greater');
+      minusBtn.classList.toggle('active', comparator === 'or-less');
+    }
+    function setComparator(next){
+      comparator = comparator === next ? 'exact' : next;
+      updateComparatorButtons();
+      if(selectedValue!=null){
+        track.assignedVertical = { value: selectedValue, comparator };
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        normalizeVerticalAssignment(track);
+        updateLabelNode(node, track);
+      }
+    }
+    plusBtn.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      setComparator('or-greater');
+    });
+    minusBtn.addEventListener('click', evt=>{
+      evt.preventDefault();
+      evt.stopPropagation();
+      setComparator('or-less');
+    });
+    updateComparatorButtons();
+    controls.append(plusBtn, minusBtn);
+    panel.appendChild(controls);
+
+    const list = document.createElement('div');
+    list.className = 'track-picker__options';
+    VERTICAL_RATE_OPTIONS.forEach(value=>{
+      const option = createPickerOption(formatVerticalOption(value), selectedValue!=null && value === selectedValue);
+      option.addEventListener('click', evt=>{
+        evt.preventDefault();
+        evt.stopPropagation();
+        selectedValue = value;
+        track.assignedVertical = { value, comparator };
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        normalizeVerticalAssignment(track);
+        updateLabelNode(node, track);
+        close();
+      });
+      list.appendChild(option);
+    });
+    panel.appendChild(list);
+
+    const manual = createManualInput({
+      placeholder: 'FPM',
+      type: 'number',
+      step: '100',
+      defaultValue: selectedValue!=null ? String(selectedValue) : '',
+      onSubmit: raw=>{
+        const parsed = parseInt(raw, 10);
+        if(!Number.isFinite(parsed)) return false;
+        const quantized = Math.round(parsed / 100) * 100;
+        selectedValue = Math.max(Math.min(quantized, 6000), -6000);
+        track.assignedVertical = { value: selectedValue, comparator };
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        normalizeVerticalAssignment(track);
+        updateLabelNode(node, track);
+        return true;
+      },
+      onClear: ()=>{
+        selectedValue = null;
+        clearVerticalAssignment(track);
+        track.labelRevision = (track.labelRevision || 0) + 1;
+        updateLabelNode(node, track);
+      },
+      close,
+    });
+    panel.appendChild(manual);
+  });
 }
