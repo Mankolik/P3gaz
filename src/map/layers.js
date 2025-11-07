@@ -1,8 +1,18 @@
 export function initDefaultLayers(state){
   const defs = [
-    ['FIR','polygon'], ['SECTOR_LOW','polygon'], ['SECTOR_HIGH','polygon'],
-    ['TMA','polygon'], ['CTR','polygon'], ['ZONES','polygon'],
-    ['WAYPOINTS','point'], ['AIRPORTS','point'], ['ROUTES','polygon']
+    ['FIR','polygon', true],
+    ['SECTOR_LOW','polygon', true],
+    ['SECTOR_HIGH','polygon', true],
+    ['TMA','polygon', true],
+    ['CTR','polygon', true],
+    ['ZONES','polygon', true],
+    ['WAYPOINTS','point', false],
+    ['AIRPORTS','point', false],
+    ['ROUTES','polygon', true]
   ];
-  defs.forEach(([n,t])=>{ if(!state.map.layers.has(n)) state.map.layers.set(n,{visible:true,type:t,features:[]}); });
+  defs.forEach(([n,t,visible=true])=>{
+    if(!state.map.layers.has(n)){
+      state.map.layers.set(n,{visible,type:t,features:[]});
+    }
+  });
 }
