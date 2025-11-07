@@ -330,12 +330,13 @@ function computeLevelDisplay(track){
   const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
   const formattedValues = items.map(item=>formatFlightLevel(item.value));
   const tokens = [];
+  const figureSpace = ' ';
   let lastValue = null;
   let suppressedCount = 0;
   let condensed = false;
   const flushSuppressed = ()=>{
     if(suppressedCount>0){
-      tokens.push(''.padEnd(suppressedCount * 3, ' '));
+      tokens.push(figureSpace.repeat(suppressedCount * 3));
       suppressedCount = 0;
     }
   };
@@ -354,6 +355,7 @@ function computeLevelDisplay(track){
     tokens.push(value);
     lastValue = value;
   }
+  flushSuppressed();
   const text = tokens.join(' ');
   return { text, tooltip, condensed, items };
 }
