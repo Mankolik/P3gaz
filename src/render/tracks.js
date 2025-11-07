@@ -202,12 +202,12 @@ function formatAssignedSpeedDisplay(assignment){
     const mach = Number(assignment.value);
     if(!Number.isFinite(mach)) return '';
     const hundredths = Math.round(mach * 100).toString().padStart(2, '0');
-    return `M${hundredths} (Mach ${mach.toFixed(2)})`;
+    return `M${hundredths}`;
   }
   const knots = Math.round(Number(assignment.value));
   if(!Number.isFinite(knots) || knots <= 0) return '';
   const tens = Math.round(knots / 10).toString().padStart(2, '0');
-  return `N${tens} (${knots}kt)`;
+  return `N${tens}`;
 }
 
 function normalizeVerticalAssignment(track, preserveFlag=false){
