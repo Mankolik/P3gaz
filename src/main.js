@@ -12,6 +12,7 @@ import { registerLayer, addFeatures } from './render/layers.js';
 import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
 import { createDemoTracks } from './radar/tracks.js';
+import { updateTrackMovement } from './radar/movement.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -40,7 +41,10 @@ async function bootstrap(){
   bus.on('camera:zoom', ({scale, x, y})=>camera.zoomAbout(scale, x, y));
 
   createTick(bus);
-  bus.on('tick', ()=>drawFrame(canvas, camera, state, overlayEl));
+  bus.on('tick', dt=>{
+    updateTrackMovement(state, dt);
+    drawFrame(canvas, camera, state, overlayEl);
+  });
 
   initDefaultLayers(state);
 

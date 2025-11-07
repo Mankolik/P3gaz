@@ -41,18 +41,17 @@ export function drawTrackSymbols(ctx, camera, tracks){
     const fill = STATUS_COLORS[track.status] || STATUS_COLORS.default;
     const stroke = STATUS_STROKES[track.status] || STATUS_STROKES.default;
     const size = (track.symbolSize || DEFAULT_SYMBOL_SIZE) * invZoom;
-    const vectorMinutes = Math.max(track.vectorMinutes || 0, 0);
-    const rawScale = Number.isFinite(track.vectorScale) ? track.vectorScale : DEFAULT_VECTOR_SCALE;
-    const vectorScale = rawScale > 0 ? rawScale : DEFAULT_VECTOR_SCALE;
-    const vecLength = vectorMinutes * vectorScale;
+    const dx = Number.isFinite(track.vectorDx) ? track.vectorDx : 0;
+    const dy = Number.isFinite(track.vectorDy) ? track.vectorDy : 0;
+    const vecLength = Math.hypot(dx, dy);
+    const angle = vecLength > 0 ? Math.atan2(dy, dx) : degToRad(track.heading);
     const half = size / 2;
-    const rad = degToRad(track.heading);
     ctx.save();
     ctx.translate(track.x, track.y);
     ctx.lineWidth = invZoom / pixelScale;
     if(vecLength > 0){
       ctx.save();
-      ctx.rotate(rad);
+      ctx.rotate(angle);
       const vectorColor = VECTOR_COLORS[track.status] || VECTOR_COLORS.default;
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -413,7 +412,13 @@ function updateLabelNode(node, track){
   node.callsign.textContent = track.callsign || 'UNKNOWN';
 
   const showGs = track.showGroundSpeed !== false;
-  const speedLabel = showGs ? formatGroundSpeed(track.groundSpeed) : formatVerticalSpeed(track.verticalSpeed);
+  let speedLabel = null;
+  if(showGs){
+    const groundSpeed = formatGroundSpeed(track.groundSpeed);
+    speedLabel = groundSpeed === '---' ? groundSpeed : `${groundSpeed}KT`;
+  }else{
+    speedLabel = formatVerticalSpeed(track.verticalSpeed);
+  }
   node.speedToggle.textContent = speedLabel;
   node.speedToggle.classList.toggle('muted', false);
   node.speedToggle.title = showGs ? 'Show vertical speed' : 'Show ground speed';
