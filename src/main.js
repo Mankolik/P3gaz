@@ -74,8 +74,16 @@ async function loadDatasets(state, camera, canvasEl){
       if(!features.length) continue;
       const layerName = entry.layer || 'FIR';
       const layerType = entry.type || features[0]?.type || 'polygon';
-      registerLayer(state, layerName, layerType);
       const filtered = features.filter(f=>!layerType || f.type===layerType);
+      if(layerName==='TMA'){
+        registerLayer(state, 'TMA_LOWER', layerType);
+        registerLayer(state, 'TMA_UPPER', layerType);
+        const { lower, upper } = splitTmaFeaturesByCeiling(filtered);
+        if(lower.length) addFeatures(state, 'TMA_LOWER', lower);
+        if(upper.length) addFeatures(state, 'TMA_UPPER', upper);
+        continue;
+      }
+      registerLayer(state, layerName, layerType);
       addFeatures(state, layerName, filtered);
       if(layerName==='FIR'){
         const bounds = boundsForFeatures(filtered, props=>{
@@ -166,6 +174,40 @@ function addCoordinateLat(coord, stats){
   if(typeof lat!=='number' || !Number.isFinite(lat)) return;
   stats.sum += lat;
   stats.count += 1;
+}
+
+function splitTmaFeaturesByCeiling(features){
+  const lower = [];
+  const upper = [];
+  for(const feature of features){
+    const ceiling = getMaxTmaCeilingFl(feature?.props);
+    if(ceiling!=null && ceiling >= 95){
+      upper.push(feature);
+    } else {
+      lower.push(feature);
+    }
+  }
+  return { lower, upper };
+}
+
+function getMaxTmaCeilingFl(props){
+  const bands = Array.isArray(props?.vertical_bands) ? props.vertical_bands : [];
+  let max = null;
+  for(const band of bands){
+    const ceiling = convertAltitudeToFl(band?.ceiling);
+    if(ceiling==null) continue;
+    if(max==null || ceiling>max) max = ceiling;
+  }
+  return max;
+}
+
+function convertAltitudeToFl(level){
+  if(!level) return null;
+  const { value, unit } = level;
+  if(typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if(unit === 'FL') return value;
+  if(unit === 'FT') return value / 100;
+  return null;
 }
 
 function boundsForFeatures(features, predicate){

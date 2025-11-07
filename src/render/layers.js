@@ -7,7 +7,8 @@ export function addFeatures(state, name, features){
 }
 const LAYER_PRIORITY_ORDER = [
   'CTR',
-  'TMA',
+  'TMA_UPPER',
+  'TMA_LOWER',
   'SECTOR_LOW',
   'SECTOR_HIGH',
   'FIR',
