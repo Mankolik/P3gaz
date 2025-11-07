@@ -6,6 +6,7 @@ const STATUS_COLORS = {
   intruder: '#ff6659',
   incoming: '#2277ff',
   outgoing: '#ff5050',
+  unconcerned: '#bfbfbf',
 };
 
 const STATUS_STROKES = {
@@ -120,10 +121,36 @@ function formatHeading(hdg){
 
 function levelItemsFromTrack(track){
   const items = [];
-  if(track.actualFlightLevel!=null) items.push({ label:'AFL', value:track.actualFlightLevel });
-  if(track.plannedEntryLevel!=null) items.push({ label:'PEL', value:track.plannedEntryLevel });
-  if(track.clearedFlightLevel!=null) items.push({ label:'CFL', value:track.clearedFlightLevel });
-  if(track.exitFlightLevel!=null) items.push({ label:'XFL', value:track.exitFlightLevel });
+  if(track.actualFlightLevel!=null){
+    items.push({ label:'AFL', value:track.actualFlightLevel });
+  }
+
+  const status = track.status || '';
+  let primaryLevel = null;
+  if(status === 'inbound' || status === 'preinbound'){
+    if(track.plannedEntryLevel!=null){
+      primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
+    }
+  }else if(track.clearedFlightLevel!=null){
+    primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+  }
+
+  if(!primaryLevel){
+    if(track.clearedFlightLevel!=null){
+      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+    }else if(track.plannedEntryLevel!=null){
+      primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
+    }
+  }
+
+  if(primaryLevel){
+    items.push(primaryLevel);
+  }
+
+  if(track.exitFlightLevel!=null){
+    items.push({ label:'XFL', value:track.exitFlightLevel });
+  }
+
   return items;
 }
 
@@ -267,15 +294,22 @@ function createLabelNode(){
   return node;
 }
 
+function filterAlerts(track){
+  if(!Array.isArray(track?.alerts)) return [];
+  if(track.status !== 'intruder') return track.alerts;
+  return track.alerts.filter(alert=>String(alert).toUpperCase() !== 'INTRUDER');
+}
+
 function updateLabelNode(node, track){
   node.track = track;
   node.revision = getTrackRevision(track);
   const status = track.status ? `status-${track.status}` : 'status-neutral';
   node.root.className = `track-label ${status}`;
 
-  if(Array.isArray(track.alerts) && track.alerts.length){
+  const alerts = filterAlerts(track);
+  if(alerts.length){
     node.row0.style.display = 'flex';
-    node.row0.textContent = track.alerts.join(' · ');
+    node.row0.textContent = alerts.join(' · ');
   }else{
     node.row0.style.display = 'none';
     node.row0.textContent = '';
@@ -284,7 +318,7 @@ function updateLabelNode(node, track){
   node.callsign.textContent = track.callsign || 'UNKNOWN';
 
   const showGs = track.showGroundSpeed !== false;
-  const speedLabel = showGs ? formatGroundSpeed(track.groundSpeed) : `VS ${formatVerticalSpeed(track.verticalSpeed)}`;
+  const speedLabel = showGs ? formatGroundSpeed(track.groundSpeed) : formatVerticalSpeed(track.verticalSpeed);
   node.speedToggle.textContent = speedLabel;
   node.speedToggle.classList.toggle('muted', false);
   node.speedToggle.title = showGs ? 'Show vertical speed' : 'Show ground speed';
@@ -301,7 +335,7 @@ function updateLabelNode(node, track){
   node.levels.classList.toggle('muted', !levelDisplay.text);
 
   const showType = track.showType !== false;
-  const typeLabel = showType ? (track.aircraftType || '---') : `SQ ${track.squawk || '----'}`;
+  const typeLabel = showType ? (track.aircraftType || '---') : (track.squawk || '----');
   node.typeToggle.textContent = typeLabel;
   node.typeToggle.title = showType ? 'Show squawk code' : 'Show aircraft type';
   node.typeToggle.classList.toggle('muted', false);
@@ -313,13 +347,13 @@ function updateLabelNode(node, track){
   node.assignedHeading.textContent = headingValue;
   node.assignedHeading.dataset.empty = headingValue === 'h';
 
-  const speedValue = track.assignedSpeed || '---';
+  const speedValue = track.assignedSpeed || 's';
   node.assignedSpeed.textContent = speedValue;
-  node.assignedSpeed.dataset.empty = speedValue === '---';
+  node.assignedSpeed.dataset.empty = speedValue === 's';
 
   const verticalValue = track.verticalRateAssigned ? 'R' : 'r';
   node.assignedVertical.textContent = verticalValue;
-  node.assignedVertical.dataset.empty = false;
+  node.assignedVertical.dataset.empty = verticalValue === 'r';
 
   const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
@@ -336,17 +370,15 @@ function measureLabel(node){
 
 function positionLabel(node, track, screen){
   measureLabel(node);
-  const overlayOffset = track.labelOffset || { x: 78, y: -46 };
-  const side = track.labelSide || (track.heading>180 ? 'left' : 'right');
+  const overlayOffset = track.labelOffset || { x: 78, y: 0 };
+  const side = track.labelSide || 'left';
   const width = node.width;
   const height = node.height;
-  let labelX;
-  if(side === 'left'){
-    labelX = screen.x - overlayOffset.x - width;
-  }else{
-    labelX = screen.x + overlayOffset.x;
-  }
-  const labelY = screen.y + overlayOffset.y;
+  const baseX = side === 'left'
+    ? screen.x - overlayOffset.x
+    : screen.x + overlayOffset.x;
+  const labelX = side === 'left' ? baseX - width : baseX;
+  const labelY = screen.y + overlayOffset.y - height / 2;
   node.root.dataset.side = side;
   node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
   const anchorX = side === 'left' ? labelX + width : labelX;
