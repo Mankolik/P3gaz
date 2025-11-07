@@ -1,16 +1,17 @@
 const STATUS_COLORS = {
-  default: '#ffffff',
+  default: '#bfbfbf',
   accepted: '#00FF55',
-  inbound: '#00FF55',
-  preinbound: '#ffffff',
+  inbound: '#ffffff',
+  preinbound: '#bfbfbf',
   intruder: '#ff6659',
+  unconcerned: '#bfbfbf',
   incoming: '#2277ff',
   outgoing: '#ff5050',
-  unconcerned: '#bfbfbf',
 };
 
 const STATUS_STROKES = {
   preinbound: '#bfbfbf',
+  unconcerned: '#bfbfbf',
   default: '#101820',
 };
 
@@ -20,10 +21,12 @@ const CONNECTOR_COLOR = '#bfbfbf';
 const VECTOR_COLORS = {
   accepted: '#00FF55',
   inbound: '#ffffff',
-  preinbound: '#ffffff',
+  preinbound: '#bfbfbf',
   intruder: '#ff6659',
   unconcerned: '#bfbfbf',
   default: '#bfbfbf',
+  incoming: '#2277ff',
+  outgoing: '#ff5050',
 };
 const DEFAULT_LABEL_OFFSET = { x: 78, y: 0 };
 
@@ -72,12 +75,14 @@ export function drawTrackSymbols(ctx, camera, tracks){
 
 export function projectTracksToScreen(tracks, camera){
   if(!Array.isArray(tracks) || !camera) return [];
+  const zoom = Math.max(camera.z || 1, 1e-6);
   return tracks
     .filter(track=>track?.x!=null && track?.y!=null)
     .map(track=>({
       track,
-      x: (track.x - camera.x) * camera.z,
-      y: (track.y - camera.y) * camera.z,
+      x: (track.x - camera.x) * zoom,
+      y: (track.y - camera.y) * zoom,
+      zoom,
     }));
 }
 
@@ -338,19 +343,25 @@ function createLabelNode(){
     const track = node.track;
     const side = track.labelSide || 'left';
     const offset = getLabelOffset(track);
+    const zoom = Number.isFinite(node.lastScreen?.zoom) ? node.lastScreen.zoom : 1;
+    const deltaX = dx / zoom;
+    const deltaY = dy / zoom;
     const nextOffset = {
-      x: side === 'left' ? offset.x - dx : offset.x + dx,
-      y: offset.y + dy,
+      x: side === 'left' ? offset.x - deltaX : offset.x + deltaX,
+      y: offset.y + deltaY,
     };
     track.labelOffset = nextOffset;
     const screen = node.lastScreen;
     if(screen){
       const width = node.width;
       const height = node.height;
+      const screenZoom = Number.isFinite(screen.zoom) ? screen.zoom : 1;
+      const scaledOffsetX = nextOffset.x * screenZoom;
+      const scaledOffsetY = nextOffset.y * screenZoom;
       const labelX = side === 'left'
-        ? screen.x - nextOffset.x - width
-        : screen.x + nextOffset.x;
-      const labelY = screen.y + nextOffset.y - height / 2;
+        ? screen.x - scaledOffsetX - width
+        : screen.x + scaledOffsetX;
+      const labelY = screen.y + scaledOffsetY - height / 2;
       node.root.dataset.side = side;
       node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
     }
@@ -457,16 +468,19 @@ function positionLabel(node, track, screen){
   const side = track.labelSide || 'left';
   const width = node.width;
   const height = node.height;
+  const zoom = Number.isFinite(screen?.zoom) ? screen.zoom : 1;
+  const scaledOffsetX = overlayOffset.x * zoom;
+  const scaledOffsetY = overlayOffset.y * zoom;
   const baseX = side === 'left'
-    ? screen.x - overlayOffset.x
-    : screen.x + overlayOffset.x;
+    ? screen.x - scaledOffsetX
+    : screen.x + scaledOffsetX;
   const labelX = side === 'left' ? baseX - width : baseX;
-  const labelY = screen.y + overlayOffset.y - height / 2;
+  const labelY = screen.y + scaledOffsetY - height / 2;
   node.root.dataset.side = side;
   node.root.style.transform = `translate(${Math.round(labelX)}px, ${Math.round(labelY)}px)`;
   const anchorX = side === 'left' ? labelX + width : labelX;
   const anchorY = labelY + height / 2;
-  node.lastScreen = { x: screen.x, y: screen.y };
+  node.lastScreen = { x: screen.x, y: screen.y, zoom };
   return { x: anchorX, y: anchorY };
 }
 
