@@ -45,7 +45,6 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .level-segment{ display:inline-flex; align-items:center; gap:3px; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .level-segment__label{ display:none; font-size:10px; letter-spacing:1px; }
 .track-label .level-segment__value{ min-width:24px; text-align:center; }
-.track-label .levels:hover .level-segment__label{ display:inline; }
 .track-label .level-segment[data-role="afl"]{ display:none; }
 .track-label .levels:hover .level-segment[data-role="afl"]{ display:inline-flex; }
 .track-label .level-segment.editable{ cursor:pointer; }
@@ -81,7 +80,6 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .row:hover .muted{ color:inherit; }
 .track-label .row:hover .levels{ color:inherit; }
 .track-label .levels{ cursor:pointer; }
-.track-label .levels[data-mode="condensed"]::after{ content:'*'; margin-left:4px; color:var(--track-gray); font-size:9px; vertical-align:top; }
 .track-label .row4 span[data-empty="true"]{ color:rgba(255,255,255,.35); }
 
 .track-picker{ background:#0b1117; border:1px solid var(--stroke); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; min-width:160px; max-width:220px; max-height:280px; box-shadow:0 12px 28px rgba(0,0,0,.45); color:var(--text); font-size:12px; }
