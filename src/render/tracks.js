@@ -337,23 +337,33 @@ function computeLevelDisplay(track){
   }
   const tooltip = tooltipValues.join(' ');
 
-  const figureTriplet = '   ';
+  const figureSpace = ' ';
   const tokens = [];
-  let lastValue = hasAfl ? formattedValues[0] ?? null : null;
   let condensed = false;
-
+  let suppressedCount = 0;
+  let lastValue = hasAfl ? formattedValues[0] ?? null : null;
   const displayStartIndex = hasAfl ? 1 : 0;
+
+  const flushSuppressed = ()=>{
+    if(suppressedCount>0){
+      tokens.push(figureSpace.repeat(suppressedCount * 3));
+      suppressedCount = 0;
+    }
+  };
+
   for(let index = displayStartIndex; index < formattedValues.length; index+=1){
     const value = formattedValues[index];
     if(lastValue!=null && value === lastValue){
-      tokens.push(figureTriplet);
       condensed = true;
+      suppressedCount += 1;
       continue;
     }
+    flushSuppressed();
     tokens.push(value);
     lastValue = value;
   }
 
+  flushSuppressed();
   const text = tokens.join(' ');
   return { text, tooltip, condensed, items };
 }
