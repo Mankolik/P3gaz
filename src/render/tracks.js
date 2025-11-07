@@ -13,7 +13,7 @@ const STATUS_STROKES = {
   default: '#101820',
 };
 
-const DEFAULT_SYMBOL_SIZE = 18;
+const DEFAULT_SYMBOL_SIZE = 12;
 const DEFAULT_VECTOR_SCALE = 6;
 const CONNECTOR_COLOR = '#bfbfbf';
 const VECTOR_COLORS = {
