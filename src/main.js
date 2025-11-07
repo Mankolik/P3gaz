@@ -28,6 +28,10 @@ async function bootstrap(){
     overlayEl.id = 'track-overlay';
     canvas.el.parentElement?.appendChild(overlayEl);
   }
+  const mainEl = canvas.el.parentElement;
+  canvas.el.addEventListener('contextmenu', evt=>evt.preventDefault());
+  overlayEl?.addEventListener('contextmenu', evt=>evt.preventDefault());
+  mainEl?.addEventListener('contextmenu', evt=>evt.preventDefault());
 
   const camera = createCamera(canvas.el);
 
