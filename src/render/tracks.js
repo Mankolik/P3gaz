@@ -270,7 +270,7 @@ function formatAssignedVerticalDisplay(assignment){
 function levelItemsFromTrack(track){
   const items = [];
   if(track.actualFlightLevel!=null){
-    items.push({ label:'AFL', value:track.actualFlightLevel });
+    items.push({ label:'AFL', value:track.actualFlightLevel, field:'actualFlightLevel' });
   }
 
   const status = track.status || '';
@@ -280,18 +280,18 @@ function levelItemsFromTrack(track){
 
   if(forceCfl){
     if(track.clearedFlightLevel!=null){
-      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+      primaryLevel = { label:'CFL', value:track.clearedFlightLevel, field:'clearedFlightLevel' };
     }
   }else if(preferPel){
     if(track.plannedEntryLevel!=null){
-      primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
+      primaryLevel = { label:'PEL', value:track.plannedEntryLevel, field:'plannedEntryLevel' };
     }else if(track.clearedFlightLevel!=null){
-      primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+      primaryLevel = { label:'CFL', value:track.clearedFlightLevel, field:'clearedFlightLevel' };
     }
   }else if(track.clearedFlightLevel!=null){
-    primaryLevel = { label:'CFL', value:track.clearedFlightLevel };
+    primaryLevel = { label:'CFL', value:track.clearedFlightLevel, field:'clearedFlightLevel' };
   }else if(track.plannedEntryLevel!=null){
-    primaryLevel = { label:'PEL', value:track.plannedEntryLevel };
+    primaryLevel = { label:'PEL', value:track.plannedEntryLevel, field:'plannedEntryLevel' };
   }
 
   if(primaryLevel){
@@ -299,19 +299,35 @@ function levelItemsFromTrack(track){
   }
 
   if(track.exitFlightLevel!=null){
-    items.push({ label:'XFL', value:track.exitFlightLevel });
+    items.push({ label:'XFL', value:track.exitFlightLevel, field:'exitFlightLevel' });
   }
 
   return items;
 }
 
+function determinePrimaryLabel(track){
+  if(!track) return null;
+  const status = track.status || '';
+  const preferPel = status === 'inbound' || status === 'preinbound';
+  const forceCfl = status === 'accepted' || status === 'intruder' || status === 'unconcerned';
+  if(forceCfl) return 'CFL';
+  if(preferPel){
+    if(track.plannedEntryLevel!=null) return 'PEL';
+    if(track.clearedFlightLevel!=null) return 'CFL';
+    return 'PEL';
+  }
+  if(track.clearedFlightLevel!=null) return 'CFL';
+  if(track.plannedEntryLevel!=null) return 'PEL';
+  return null;
+}
+
 function computeLevelDisplay(track){
   const items = levelItemsFromTrack(track);
-  if(items.length===0) return { text:'', tooltip:'', condensed:false };
+  if(items.length===0) return { text:'', tooltip:'', condensed:false, items };
   const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
   const displayItems = items.filter(item=>item.label !== 'AFL');
   if(displayItems.length===0){
-    return { text:'', tooltip, condensed:false };
+    return { text:'', tooltip, condensed:false, items };
   }
   const rawValues = displayItems.map(item=>formatFlightLevel(item.value));
   const displayValues = [];
@@ -321,7 +337,43 @@ function computeLevelDisplay(track){
     }
   }
   const condensed = displayValues.length < rawValues.length;
-  return { text: displayValues.join(' '), tooltip, condensed };
+  return { text: displayValues.join(' '), tooltip, condensed, items };
+}
+
+function updateLevelSegments(node, track, items){
+  if(!node || !node.levelSegments) return;
+  const segments = node.levelSegments;
+  const aflItem = items.find(item=>item.label === 'AFL');
+  applyLevelSegment(segments.afl, 'AFL', aflItem?.value ?? track?.actualFlightLevel, null, false);
+
+  const primaryItem = items.find(item=>item.label === 'CFL' || item.label === 'PEL');
+  const primaryLabel = primaryItem?.label || determinePrimaryLabel(track) || 'CFL';
+  const primaryField = primaryItem?.field || (primaryLabel === 'PEL' ? 'plannedEntryLevel' : 'clearedFlightLevel');
+  const primaryEditable = !!primaryItem && !!primaryField;
+  const primaryValue = primaryItem?.value ?? track?.[primaryField] ?? null;
+  applyLevelSegment(segments.primary, primaryLabel, primaryValue, primaryEditable ? primaryField : null, primaryEditable);
+
+  const exitItem = items.find(item=>item.label === 'XFL');
+  const exitValue = exitItem?.value ?? track?.exitFlightLevel ?? null;
+  applyLevelSegment(segments.exit, 'XFL', exitValue, 'exitFlightLevel', true);
+}
+
+function applyLevelSegment(segment, label, value, field, editable){
+  if(!segment) return;
+  segment.label.textContent = label || '';
+  segment.value.textContent = formatFlightLevel(value);
+  if(field){
+    segment.segment.dataset.field = field;
+  }else{
+    delete segment.segment.dataset.field;
+  }
+  if(label){
+    segment.segment.dataset.label = label;
+  }else{
+    delete segment.segment.dataset.label;
+  }
+  segment.segment.dataset.editable = editable ? 'true' : 'false';
+  segment.segment.classList.toggle('editable', !!editable);
 }
 
 function formatVsIndicator(vs){
@@ -375,6 +427,29 @@ function createLabelNode(){
   vsIndicator.className = 'vs-indicator muted';
   const levels = document.createElement('span');
   levels.className = 'levels muted';
+  const levelsDisplay = document.createElement('span');
+  levelsDisplay.className = 'levels__display';
+  const levelsDetail = document.createElement('span');
+  levelsDetail.className = 'levels__detail';
+
+  const createLevelSegment = role=>{
+    const segment = document.createElement('span');
+    segment.className = `level-segment level-${role}`;
+    segment.dataset.role = role;
+    const label = document.createElement('span');
+    label.className = 'level-segment__label';
+    const value = document.createElement('span');
+    value.className = 'level-segment__value';
+    segment.append(label, value);
+    return { segment, label, value };
+  };
+
+  const levelAfl = createLevelSegment('afl');
+  const levelPrimary = createLevelSegment('primary');
+  const levelExit = createLevelSegment('exit');
+
+  levelsDetail.append(levelAfl.segment, levelPrimary.segment, levelExit.segment);
+  levels.append(levelsDisplay, levelsDetail);
 
   row2.append(afl, vsIndicator, levels);
 
@@ -408,6 +483,13 @@ function createLabelNode(){
     afl,
     vsIndicator,
     levels,
+    levelsDisplay,
+    levelsDetail,
+    levelSegments: {
+      afl: levelAfl,
+      primary: levelPrimary,
+      exit: levelExit,
+    },
     typeToggle,
     wake,
     destination,
@@ -445,9 +527,21 @@ function createLabelNode(){
   });
 
   levels.addEventListener('click', evt=>{
+    if(!node.track) return;
+    const segmentEl = evt.target.closest('.level-segment');
+    if(segmentEl && levels.contains(segmentEl)){
+      const editable = segmentEl.dataset.editable === 'true';
+      if(!editable) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      const field = segmentEl.dataset.field;
+      if(!field) return;
+      const label = segmentEl.dataset.label || segmentEl.dataset.role || '';
+      openSingleLevelPicker(node, segmentEl, { label, key: field });
+      return;
+    }
     evt.preventDefault();
     evt.stopPropagation();
-    if(!node.track) return;
     openLevelPicker(node, levels);
   });
 
@@ -539,6 +633,13 @@ function createLabelNode(){
     openVerticalPicker(node, node.assignedVertical);
   });
 
+  node.ecl.addEventListener('click', evt=>{
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openEclPicker(node, node.ecl);
+  });
+
   return node;
 }
 
@@ -583,10 +684,12 @@ function updateLabelNode(node, track){
   node.vsIndicator.classList.toggle('muted', track.verticalSpeed==null || track.verticalSpeed===0);
 
   const levelDisplay = computeLevelDisplay(track);
-  node.levels.textContent = levelDisplay.text;
+  node.levelsDisplay.textContent = levelDisplay.text;
   node.levels.dataset.mode = levelDisplay.condensed ? 'condensed' : 'full';
   node.levels.title = levelDisplay.tooltip;
-  node.levels.classList.toggle('muted', !levelDisplay.text);
+  const hasDisplayLevels = levelDisplay.items?.some(item=>item.label !== 'AFL');
+  node.levels.classList.toggle('muted', !hasDisplayLevels);
+  updateLevelSegments(node, track, levelDisplay.items || []);
 
   const showType = track.showType !== false;
   const typeLabel = showType ? (track.aircraftType || '---') : (track.squawk || '----');
@@ -1094,6 +1197,22 @@ function openLevelPicker(node, anchor){
     hint.textContent = 'Only CFL changes the actual flight level.';
     panel.appendChild(hint);
   });
+}
+
+function openSingleLevelPicker(node, anchor, field){
+  if(!node || !anchor || !node.track || !field || !field.key) return;
+  const track = node.track;
+  showTrackPicker(node, anchor, 'track-picker--levels', (panel, _close)=>{
+    panel.dataset.type = 'levels-single';
+    const container = document.createElement('div');
+    container.className = 'track-picker__levels';
+    container.appendChild(createLevelEditor({ label: field.label || field.key, key: field.key }, track, node));
+    panel.appendChild(container);
+  });
+}
+
+function openEclPicker(node, anchor){
+  openSingleLevelPicker(node, anchor, { label: 'ECL', key: 'expectedCruiseLevel' });
 }
 
 function createLevelEditor(field, track, node){
