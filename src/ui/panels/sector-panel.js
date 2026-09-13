@@ -1,3 +1,5 @@
+import { sectorLimitsText } from '../../radar/sectors.js';
+
 export function mountSectorPanel(parent, overlay, state){
   const panel = document.createElement('section');
   panel.id = 'track-sector-panel';
@@ -36,7 +38,7 @@ export function mountSectorPanel(parent, overlay, state){
     if(selectedId){
       if(!membership || membership.status === 'unknown') description = 'Sector information unavailable';
       else if(membership.status === 'outside') description = 'Outside loaded sector limits';
-      else description = membership.sectors.map(sector=>`${sector.name}\nFL${String(sector.minFl).padStart(3,'0')} ≤ AFL < FL${sector.maxFl}`).join('\n\n');
+      else description = membership.sectors.map(sector=>`${sector.name}\n${sectorLimitsText(sector)}`).join('\n\n');
       if(membership?.sectors.length > 1) description += '\n\nShared boundary / overlapping sectors';
     }
     const display = JSON.stringify([selectedId,name,actualLevel,description]);

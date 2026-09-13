@@ -233,7 +233,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.waitForFunction(()=>[...document.querySelectorAll('.track-label')].every(label=>label.dataset.sectorStatus !== 'unknown'));
     const wizz = page.locator('.track-label').filter({has:page.locator('.callsign', {hasText:'WZZ1891'})});
     assert.equal(await wizz.getAttribute('data-sectors'), 'E:HIGH');
-    assert.match(await wizz.locator('.callsign').getAttribute('title'), /EPWW E HIGH.*FL365–660/);
+    assert.match(await wizz.locator('.callsign').getAttribute('title'), /EPWW E HIGH.*FL365–FL660/);
     const sectorPanel = page.locator('#track-sector-panel');
     await wizz.hover({force:true});
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'WZZ1891');
@@ -258,13 +258,25 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
     await page.evaluate(()=>{
       const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+      track.actualFlightLevel=200; track.clearedFlightLevel=200;
+    });
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWA TMA A'));
+    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/2000 FT AMSL–FL245/);
+    assert.doesNotMatch(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW/);
+    await page.evaluate(()=>{
+      const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+      track.actualFlightLevel=245; track.clearedFlightLevel=245;
+    });
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
+    await page.evaluate(()=>{
+      const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
       track.lon=0; track.lat=0; track.groundSpeed=0; track.assignedSpeed=null;
     });
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.sectorStatus === 'outside');
     const lot = page.locator('.track-label').filter({has:page.locator('.callsign',{hasText:'LOT612'})});
     await lot.hover({force:true});
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'LOT612');
-    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW F LOW/);
+    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPGD UTMA/);
     await page.setViewportSize({width:800,height:600});
     await page.waitForFunction(()=>{
       const r = document.querySelector('#track-sector-panel').getBoundingClientRect();
