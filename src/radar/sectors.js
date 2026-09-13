@@ -54,9 +54,9 @@ export function createSectorIndex(collections, { complete = true } = {}){
         continue;
       }
       const code = String(props.sector);
-      const vertical = isTma ? (code === 'UTMA' ? 'UTMA' : 'TMA') : String(props.vertical);
+      const vertical = isTma ? (props.vertical === 'UTMA' || code === 'UTMA' ? 'UTMA' : 'TMA') : String(props.vertical);
       const id = isTma ? `TMA:${props.icao}:${props.tma_id || `${props.tma}:${code}`}` : `${code}:${vertical}`;
-      const name = isTma ? `${props.tma}${['UTMA','TMA'].includes(code) ? '' : ` ${code}`}` : (props.name || `${code} ${vertical}`);
+      const name = props.name || (isTma ? `${props.tma}${['UTMA','TMA'].includes(code) ? '' : ` ${code}`}` : `${code} ${vertical}`);
       bands.forEach((band, bandIndex)=>sectors.push({
         id:bands.length > 1 ? `${id}:${bandIndex}` : id, code, vertical, name,
         kind:isTma ? 'TMA' : 'ACC',

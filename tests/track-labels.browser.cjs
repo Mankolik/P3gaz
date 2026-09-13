@@ -256,6 +256,30 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       track.clearedFlightLevel=360;
     });
     await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
+    // The same last-hovered track follows the rebuilt Krakow vertical stack.
+    for(const [level,name,limits] of [
+      [25,'EPKK LTMA','2300 FT AMSL–3500 FT AMSL'],
+      [35,'EPKK LTMA B','3500 FT AMSL–FL095'],
+      [95,'EPKK UTMA A','FL095–FL245'],
+      [245,'EPKK UTMA B','FL245–FL285'],
+      [285,'EPWW J LOW','FL095–FL365'],
+    ]){
+      await page.evaluate(level=>{
+        const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+        track.lon=19.97639; track.lat=50.11639;
+        track.groundSpeed=0; track.assignedSpeed=null;
+        track.actualFlightLevel=level; track.clearedFlightLevel=level;
+      },level);
+      await page.waitForFunction(({name,limits})=>{
+        const details=document.querySelector('.sector-panel__details').textContent;
+        return details.includes(name) && details.includes(limits);
+      },{name,limits});
+    }
+    // Return to Warsaw for the existing EPWA checks below.
+    await page.evaluate(()=>{
+      const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+      track.lon=20.967; track.lat=52.165;
+    });
     await page.evaluate(()=>{
       const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
       track.actualFlightLevel=200; track.clearedFlightLevel=200;
