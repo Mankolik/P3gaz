@@ -49,11 +49,6 @@ const MACH_SPEED_OPTIONS = Array.from({ length: Math.floor((MACH_SPEED_MAX - MAC
   (_, index)=>Number((MACH_SPEED_MIN + index * MACH_SPEED_STEP).toFixed(MACH_LABEL_PRECISION)));
 const VERTICAL_RATE_OPTIONS = Array.from({ length: Math.floor((VERTICAL_RATE_MAX - VERTICAL_RATE_MIN) / VERTICAL_RATE_STEP) + 1 },
   (_, index)=>VERTICAL_RATE_MIN + index * VERTICAL_RATE_STEP);
-const LEVEL_FIELDS = [
-  { label: 'PEL', key: 'plannedEntryLevel' },
-  { label: 'CFL', key: 'clearedFlightLevel' },
-  { label: 'XFL', key: 'exitFlightLevel' },
-];
 const LEVEL_OPTIONS = Array.from({
   length: Math.floor((LEVEL_MAX - LEVEL_MIN) / LEVEL_STEP) + 1,
 }, (_, index)=>LEVEL_MIN + index * LEVEL_STEP);
@@ -324,42 +319,6 @@ function determinePrimaryLabel(track){
   return null;
 }
 
-function computeLevelDisplay(track){
-  const items = levelItemsFromTrack(track);
-  if(items.length===0) return { text:'', tooltip:'', condensed:false, items };
-  const tooltip = items.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
-  const formattedValues = items.map(item=>formatFlightLevel(item.value));
-  const tokens = [];
-  const figureSpace = ' ';
-  let lastValue = null;
-  let suppressedCount = 0;
-  let condensed = false;
-  const flushSuppressed = ()=>{
-    if(suppressedCount>0){
-      tokens.push(figureSpace.repeat(suppressedCount * 3));
-      suppressedCount = 0;
-    }
-  };
-  for(const value of formattedValues){
-    if(tokens.length===0){
-      tokens.push(value);
-      lastValue = value;
-      continue;
-    }
-    if(value === lastValue){
-      condensed = true;
-      suppressedCount += 1;
-      continue;
-    }
-    flushSuppressed();
-    tokens.push(value);
-    lastValue = value;
-  }
-  flushSuppressed();
-  const text = tokens.join(' ');
-  return { text, tooltip, condensed, items };
-}
-
 function updateLevelSegments(node, track, items){
   if(!node || !node.levelSegments) return;
   const segments = node.levelSegments;
@@ -370,13 +329,21 @@ function updateLevelSegments(node, track, items){
   const primaryItem = items.find(item=>item.label === 'CFL' || item.label === 'PEL');
   const primaryLabel = primaryItem?.label || determinePrimaryLabel(track) || 'CFL';
   const primaryField = primaryItem?.field || (primaryLabel === 'PEL' ? 'plannedEntryLevel' : 'clearedFlightLevel');
-  const primaryEditable = !!primaryItem && !!primaryField;
+  const primaryEditable = !!primaryField;
   const primaryValue = primaryItem?.value ?? track?.[primaryField] ?? null;
   applyLevelSegment(segments.primary, primaryLabel, primaryValue, primaryEditable ? primaryField : null, primaryEditable);
 
   const exitItem = items.find(item=>item.label === 'XFL');
   const exitValue = exitItem?.value ?? track?.exitFlightLevel ?? null;
   applyLevelSegment(segments.exit, 'XFL', exitValue, 'exitFlightLevel', true);
+
+  // Keep every field in the same column, even when a repeated value is hidden.
+  let previousValue = null;
+  for(const segment of [segments.afl, segments.primary, segments.exit]){
+    const value = segment.value.textContent;
+    segment.segment.classList.toggle('is-repeated', value !== '---' && value === previousValue);
+    previousValue = value;
+  }
 }
 
 function applyLevelSegment(segment, label, value, field, editable, trend){
@@ -400,26 +367,17 @@ function applyLevelSegment(segment, label, value, field, editable, trend){
   }
   segment.segment.dataset.editable = editable ? 'true' : 'false';
   segment.segment.classList.toggle('editable', !!editable);
+  segment.value.title = `${label} ${formatFlightLevel(value)}`;
+  if(segment.value.tagName === 'BUTTON'){
+    segment.value.disabled = !editable;
+    segment.value.setAttribute('aria-label', `Edit ${label}, ${formatFlightLevel(value)}`);
+  }
 }
 
 function formatVsIndicator(vs){
   if(vs>0) return '↑';
   if(vs<0) return '↓';
   return '';
-}
-
-function injectTrendIntoLevelText(text, trend){
-  const trendValue = trend || '';
-  const baseText = text || '';
-  if(!trendValue) return baseText;
-  if(!baseText) return trendValue;
-  const startIndex = baseText.search(/\S/);
-  if(startIndex < 0) return trendValue;
-  let endIndex = startIndex;
-  while(endIndex < baseText.length && !/\s/.test(baseText[endIndex])){
-    endIndex += 1;
-  }
-  return `${baseText.slice(0, endIndex)}${trendValue}${baseText.slice(endIndex)}`;
 }
 
 function formatExpectedLevel(level){
@@ -463,10 +421,6 @@ function createLabelNode(){
 
   const levels = document.createElement('span');
   levels.className = 'levels muted';
-  const levelsDisplay = document.createElement('span');
-  levelsDisplay.className = 'levels__display';
-  const levelsDisplayValue = document.createElement('span');
-  levelsDisplayValue.className = 'levels__display-value';
   const levelsDetail = document.createElement('span');
   levelsDetail.className = 'levels__detail';
 
@@ -480,7 +434,8 @@ function createLabelNode(){
     if(trend){
       trend.className = 'level-segment__trend';
     }
-    const value = document.createElement('span');
+    const value = document.createElement(role === 'afl' ? 'span' : 'button');
+    if(role !== 'afl') value.type = 'button';
     value.className = 'level-segment__value';
     if(trend){
       segment.append(label, value, trend);
@@ -495,8 +450,7 @@ function createLabelNode(){
   const levelExit = createLevelSegment('exit');
 
   levelsDetail.append(levelAfl.segment, levelPrimary.segment, levelExit.segment);
-  levelsDisplay.append(levelsDisplayValue);
-  levels.append(levelsDisplay, levelsDetail);
+  levels.append(levelsDetail);
 
   row2.append(levels);
 
@@ -528,8 +482,6 @@ function createLabelNode(){
     callsign,
     speedToggle,
     levels,
-    levelsDisplay,
-    levelsDisplayValue,
     levelsDetail,
     levelSegments: {
       afl: levelAfl,
@@ -574,8 +526,9 @@ function createLabelNode(){
 
   levels.addEventListener('click', evt=>{
     if(!node.track) return;
-    const segmentEl = evt.target.closest('.level-segment');
-    if(segmentEl && levels.contains(segmentEl)){
+    const valueEl = evt.target.closest('button.level-segment__value');
+    if(valueEl && levels.contains(valueEl)){
+      const segmentEl = valueEl.closest('.level-segment');
       const editable = segmentEl.dataset.editable === 'true';
       if(!editable) return;
       evt.preventDefault();
@@ -583,12 +536,8 @@ function createLabelNode(){
       const field = segmentEl.dataset.field;
       if(!field) return;
       const label = segmentEl.dataset.label || segmentEl.dataset.role || '';
-      openSingleLevelPicker(node, segmentEl, { label, key: field });
-      return;
+      openSingleLevelPicker(node, valueEl, { label, key: field });
     }
-    evt.preventDefault();
-    evt.stopPropagation();
-    openLevelPicker(node, levels);
   });
 
   const handlePointerDown = evt=>{
@@ -724,14 +673,10 @@ function updateLabelNode(node, track){
   node.speedToggle.classList.toggle('muted', false);
   node.speedToggle.title = showGs ? 'Show vertical speed' : 'Show ground speed';
 
-  const levelDisplay = computeLevelDisplay(track);
-  const displayTrend = formatVsIndicator(track.verticalSpeed);
-  node.levelsDisplayValue.textContent = injectTrendIntoLevelText(levelDisplay.text, displayTrend);
-  node.levels.dataset.mode = levelDisplay.condensed ? 'condensed' : 'full';
-  node.levels.title = levelDisplay.tooltip;
-  const hasDisplayLevels = (levelDisplay.text || '').trim().length > 0;
-  node.levels.classList.toggle('muted', !hasDisplayLevels);
-  updateLevelSegments(node, track, levelDisplay.items || []);
+  const levelItems = levelItemsFromTrack(track);
+  node.levels.title = levelItems.map(item=>`${item.label} ${formatFlightLevel(item.value)}`).join(' | ');
+  node.levels.classList.toggle('muted', levelItems.length === 0);
+  updateLevelSegments(node, track, levelItems);
 
   const showType = track.showType !== false;
   const typeLabel = showType ? (track.aircraftType || '---') : (track.squawk || '----');
@@ -848,13 +793,15 @@ export function syncTrackLabels(overlay, projected){
 
 function closeActivePicker(){
   if(!activeTrackPicker) return;
-  document.removeEventListener('pointerdown', activeTrackPicker.handlePointerDown, true);
-  document.removeEventListener('keydown', activeTrackPicker.handleKeyDown, true);
-  activeTrackPicker.panel?.remove();
-  if(activeTrackPicker.node){
-    activeTrackPicker.node.activePicker = null;
-  }
+  const picker = activeTrackPicker;
+  // Removing a focused input can fire change and attempt to close again.
   activeTrackPicker = null;
+  document.removeEventListener('pointerdown', picker.handlePointerDown, true);
+  document.removeEventListener('keydown', picker.handleKeyDown, true);
+  if(picker.node){
+    picker.node.activePicker = null;
+  }
+  picker.panel?.remove();
 }
 
 function shouldRefreshMetrics(node, track){
@@ -1220,24 +1167,6 @@ function openVerticalPicker(node, anchor){
       close,
     });
     panel.appendChild(manual);
-  });
-}
-
-function openLevelPicker(node, anchor){
-  if(!node || !anchor || !node.track) return;
-  const track = node.track;
-  showTrackPicker(node, anchor, 'track-picker--levels', (panel, close)=>{
-    panel.dataset.type = 'levels';
-    const container = document.createElement('div');
-    container.className = 'track-picker__levels';
-    LEVEL_FIELDS.forEach(field=>{
-      container.appendChild(createLevelEditor(field, track, node, close, { closeOnSelect: false }));
-    });
-    panel.appendChild(container);
-    const hint = document.createElement('div');
-    hint.className = 'track-picker__hint';
-    hint.textContent = 'Only CFL changes the actual flight level.';
-    panel.appendChild(hint);
   });
 }
 

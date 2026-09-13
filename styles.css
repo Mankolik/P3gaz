@@ -28,37 +28,31 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 /* CANVAS */
 #main{ position:relative; overflow:hidden } #radar{ width:100%; height:100%; display:block; background:#020609; touch-action:none }
 #track-overlay{ position:absolute; inset:0; pointer-events:none; font-family:'VCR OSD Mono','Aldrich','Courier New',monospace; font-size:12px; line-height:1.2; color:var(--track-white); }
-.track-label{ position:absolute; min-width:130px; padding:4px 6px; background:transparent; border:none; border-radius:6px; box-shadow:none; display:flex; flex-direction:column; gap:1px; pointer-events:auto; text-transform:uppercase; transition:transform .1s ease-out; font-size:12px; }
+.track-label{ position:absolute; width:max-content; padding:2px 4px; background:transparent; border:none; border-radius:4px; box-shadow:none; display:flex; flex-direction:column; gap:1px; pointer-events:auto; text-transform:uppercase; transition:transform .1s ease-out; font-size:12px; line-height:1.15; font-variant-numeric:tabular-nums; }
 .track-label.dragging{ transition:none; cursor:grabbing; }
-.track-label .row{ display:flex; align-items:center; gap:6px; white-space:nowrap; justify-content:flex-start; text-align:left; }
+.track-label .row{ display:flex; align-items:center; gap:5px; flex-wrap:nowrap; white-space:nowrap; justify-content:flex-start; text-align:left; }
 .track-label .row0{ min-height:10px; letter-spacing:1px; color:var(--track-red); }
-.track-label .callsign{ letter-spacing:1px; }
-.track-label .toggle{ cursor:pointer; user-select:none; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
+.track-label .callsign{ letter-spacing:.5px; padding:0 1px; }
+.track-label .toggle{ cursor:pointer; user-select:none; padding:0 1px; border-radius:3px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .toggle:hover{ background:rgba(255,255,255,.08); }
 .track-label .row2{ gap:0; }
-.track-label .row2 .levels{ flex:1; letter-spacing:1px; display:inline-flex; align-items:center; gap:4px; }
-.track-label .levels__display{ display:inline-flex; align-items:center; flex:1; }
-.track-label .levels__display-value{ display:inline-block; }
-.track-label .levels__detail{ display:none; gap:4px; align-items:center; flex:1; }
-.track-label .levels:hover .levels__display{ display:none; }
-.track-label .levels:hover .levels__detail{ display:inline-flex; }
-.track-label .level-segment{ display:inline-flex; align-items:center; gap:3px; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
-.track-label .level-segment[data-role="afl"]{ gap:0; }
-.track-label .level-segment__trend{ display:none; min-width:10px; text-align:center; }
-.track-label .level-segment[data-role="afl"] .level-segment__trend{ min-width:0; }
-.track-label .level-segment.has-trend .level-segment__trend{ display:inline; }
-.track-label .level-segment__label{ display:none; font-size:10px; letter-spacing:1px; }
-.track-label .level-segment__value{ min-width:24px; text-align:center; }
-.track-label .levels:hover .level-segment__label{ display:none; }
-.track-label .level-segment[data-role="afl"]{ display:none; }
-.track-label .levels:hover .level-segment[data-role="afl"]{ display:inline-flex; }
-.track-label .level-segment.editable{ cursor:pointer; }
-.track-label .level-segment.editable:hover{ background:rgba(255,255,255,.1); }
-.track-label .level-segment.editable:active{ background:rgba(255,255,255,.18); }
-.track-label .level-segment[data-editable="false"]{ cursor:default; }
+.track-label .row2 .levels{ display:inline-flex; letter-spacing:0; cursor:default; }
+.track-label .levels__detail{ display:inline-flex; gap:6px; align-items:center; }
+.track-label .level-segment{ display:inline-flex; align-items:center; flex:none; }
+/* Reserve the trend slot and reveal repeated values without changing geometry. */
+.track-label .level-segment__trend{ display:inline-block; width:1ch; text-align:center; }
+.track-label .level-segment__label{ display:none; }
+.track-label .level-segment__value{ appearance:none; box-sizing:content-box; display:inline-block; width:3ch; margin:0; padding:0 1px; border:0; border-radius:3px; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; text-align:left; }
+.track-label .level-segment.is-repeated .level-segment__value{ opacity:0; }
+.track-label .levels:hover .level-segment__value,
+.track-label .levels:focus-within .level-segment__value{ opacity:1; }
+.track-label .level-segment.editable .level-segment__value{ cursor:pointer; }
+.track-label .level-segment.editable .level-segment__value:hover{ background:rgba(255,255,255,.1); }
+.track-label .level-segment.editable .level-segment__value:active{ background:rgba(255,255,255,.18); }
+.track-label .level-segment__value:focus-visible{ outline:1px solid currentColor; outline-offset:1px; }
 .track-label .row3, .track-label .row4{ letter-spacing:.5px; }
 .track-label .row4{ gap:4px; }
-.track-label .row4 span{ min-width:22px; text-align:center; cursor:pointer; padding:0 4px; border-radius:4px; transition:background .15s ease-out, color .15s ease-out; }
+.track-label .row4 span{ min-width:2ch; text-align:left; cursor:pointer; padding:0 1px; border-radius:3px; transition:background .15s ease-out, color .15s ease-out; }
 .track-label .row4 span:hover{ background:rgba(255,255,255,.1); }
 .track-label .row4 span:active{ background:rgba(255,255,255,.18); }
 .track-label .row4 .assigned-vertical{ min-width:14px; }
@@ -84,7 +78,6 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label[data-side="right"] .row{ justify-content:flex-start; }
 .track-label .row:hover .muted{ color:inherit; }
 .track-label .row:hover .levels{ color:inherit; }
-.track-label .levels{ cursor:pointer; }
 .track-label .row4 span[data-empty="true"]{ color:rgba(255,255,255,.35); }
 
 .track-picker{ background:#0b1117; border:1px solid var(--stroke); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; min-width:160px; max-width:220px; max-height:280px; box-shadow:0 12px 28px rgba(0,0,0,.45); color:var(--text); font-size:12px; }
@@ -93,7 +86,7 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-picker__option:hover{ background:rgba(255,255,255,.08); }
 .track-picker__option.selected{ background:#122030; border-color:#1f2c3b; }
 .track-picker__manual{ display:flex; gap:6px; align-items:center; }
-.track-picker__manual input{ flex:1; background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 6px; color:inherit; font-size:12px; }
+.track-picker__manual input{ flex:1; min-width:0; width:100%; background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 6px; color:inherit; font-size:12px; }
 .track-picker__clear,.track-picker__controls button,.track-picker__mode-toggle button{ background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 8px; color:inherit; cursor:pointer; font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
 .track-picker__clear:hover,.track-picker__controls button:hover,.track-picker__mode-toggle button:hover{ background:#162230; }
 .track-picker__controls{ display:flex; gap:6px; justify-content:flex-end; }
@@ -108,11 +101,10 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-picker__level-label{ min-width:36px; font-weight:600; letter-spacing:.5px; }
 .track-picker__level .track-picker__options{ max-height:140px; }
 .track-picker__level input{ flex:1; background:#101820; border:1px solid #233242; border-radius:6px; padding:4px 6px; color:inherit; font-size:12px; }
-.track-picker__hint{ font-size:11px; color:var(--text-dim); margin-top:4px; }
 
 @media (max-width: 960px){
   #track-overlay{ font-size:11px; }
-  .track-label{ min-width:120px; padding:4px 6px; }
+  .track-label{ font-size:11px; }
 }
 /* BOTTOM BAR */
 footer#bottombar{ background:var(--panel); border-top:1px solid var(--stroke); padding:8px }
