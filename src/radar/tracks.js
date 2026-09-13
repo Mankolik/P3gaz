@@ -1,4 +1,5 @@
 import { parseSpeedInstruction } from '../utils/speed.js';
+import { setFlightPlan } from './routes.js';
 
 const KNOWN_TRACK_STATUSES = new Set([
   'accepted',
@@ -42,6 +43,9 @@ function baseTrack(data, project, index){
     wake: data.wake,
     destination: data.destination,
     exitPoint: data.exitPoint,
+    flightPlan: null,
+    directTo: null,
+    navigationMode: 'heading',
     assignedHeading: data.assignedHeading,
     assignedSpeed: speedInstruction,
     verticalRateAssigned: data.verticalRateAssigned || false,
@@ -61,6 +65,7 @@ function baseTrack(data, project, index){
     base.x = data.x ?? 0;
     base.y = data.y ?? 0;
   }
+  if(data.flightPlan) setFlightPlan(base, data.flightPlan.waypoints, data.flightPlan.nextIndex ?? 0);
   return base;
 }
 

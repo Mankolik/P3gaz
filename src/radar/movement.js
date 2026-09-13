@@ -1,4 +1,5 @@
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
+import { navigationTarget, navigationHeading, passedNavigationPoint, completeNavigationPoint } from './routes.js';
 
 const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
 const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
@@ -61,7 +62,13 @@ export function updateTrackMovement(state, dt){
   }
 
   for(const track of tracks){
-    advanceTrack(track, seconds, project);
+    // Small navigation steps preserve turn rate and fix capture at accelerated time.
+    let remaining = seconds;
+    while(remaining > 0){
+      const step = navigationTarget(track) ? Math.min(remaining,0.5) : remaining;
+      advanceTrack(track, step, project);
+      remaining -= step;
+    }
   }
 }
 
@@ -75,7 +82,12 @@ function advanceTrack(track, dtSeconds, project){
     return;
   }
   const heading = normalizeHeading(track.heading);
-  const nextHeading = updateHeading(track, heading, dtSeconds);
+  let targetPoint = navigationTarget(track);
+  if(targetPoint && track.groundSpeed > 0 && passedNavigationPoint(track,track,targetPoint)){
+    completeNavigationPoint(track);
+    targetPoint = navigationTarget(track);
+  }
+  const nextHeading = updateHeading(track, heading, dtSeconds, targetPoint ? navigationHeading(track,targetPoint) : null);
   track.heading = nextHeading;
 
   const speed = updateGroundSpeed(track, dtSeconds, nextHeading);
@@ -93,6 +105,10 @@ function advanceTrack(track, dtSeconds, project){
 
   track.lon = nextLon;
   track.lat = nextLat;
+
+  if(targetPoint && distanceNm > 0 && passedNavigationPoint({lon,lat},{lon:nextLon,lat:nextLat},targetPoint)){
+    completeNavigationPoint(track);
+  }
 
   const projected = projectPosition(project, nextLon, nextLat, { x: track.x ?? 0, y: track.y ?? 0 });
   track.x = projected.x;
@@ -128,11 +144,11 @@ function updateTrackVector(track, project){
   track.vectorDy = futureProjected.y - (track.y ?? 0);
 }
 
-function updateHeading(track, currentHeading, dtSeconds){
+function updateHeading(track, currentHeading, dtSeconds, navigationHeading=null){
   if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
     return currentHeading;
   }
-  const target = Number.isFinite(track?.assignedHeading) ? normalizeHeading(track.assignedHeading) : null;
+  const target = navigationHeading ?? (Number.isFinite(track?.assignedHeading) ? normalizeHeading(track.assignedHeading) : null);
   if(target==null){
     return currentHeading;
   }

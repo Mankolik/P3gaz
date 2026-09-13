@@ -104,7 +104,7 @@ export function drawFrame(canvas, camera, state, overlay){
 
   if(tracks.length){
     const projected = projectTracksToScreen(tracks, camera);
-    const anchors = overlay ? syncTrackLabels(overlay, projected) : new Map();
+    const anchors = overlay ? syncTrackLabels(overlay, projected, state.air.navigationIndex) : new Map();
     drawTrackConnectors(ctx, projected, anchors);
   } else if(overlay){
     // Remove any stale labels if tracks have been cleared.
