@@ -83,10 +83,9 @@ header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; al
 .track-label .row4 .assigned-ecl{ opacity:0; }
 .track-label:hover .row4 span{ opacity:1; }
 
-.track-label .direct-to{ appearance:none; padding:0 1px; border:0; border-radius:3px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
-.track-label .direct-to[data-empty="true"]{ opacity:0; }
-.track-label:hover .direct-to,.track-label .direct-to:focus-visible{ opacity:1; }
-.track-label .direct-to:hover{ background:rgba(255,255,255,.1); }
+.track-label .destination{ appearance:none; margin:0; padding:0; border:0; border-radius:3px; background:transparent; font:inherit; letter-spacing:inherit; cursor:pointer; }
+.track-label .destination:hover{ background:rgba(255,255,255,.1); }
+.track-label .destination:focus-visible{ outline:1px solid currentColor; outline-offset:1px; }
 .track-picker.track-picker--direct-to{ width:300px; min-width:0; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow-y:auto; }
 .direct-to__input,.dropdown-search{ min-width:0; width:100%; background:#101820; border:1px solid #233242; border-radius:6px; padding:6px 8px; color:var(--text); font:inherit; }
 .direct-to__input{ text-transform:uppercase; }

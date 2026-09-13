@@ -461,14 +461,11 @@ function createLabelNode(){
   typeToggle.className = 'toggle type muted';
   const wake = document.createElement('span');
   wake.className = 'wake';
-  const destination = document.createElement('span');
+  const destination = document.createElement('button');
+  destination.type = 'button';
   destination.className = 'destination muted';
-
-  const directTo = document.createElement('button');
-  directTo.type = 'button';
-  directTo.className = 'direct-to';
-  directTo.setAttribute('aria-label','Direct to point');
-  row3.append(typeToggle, wake, destination, directTo);
+  destination.setAttribute('aria-label','Direct to point');
+  row3.append(typeToggle, wake, destination);
 
   const assignedHeading = document.createElement('span');
   assignedHeading.className = 'assigned-heading';
@@ -498,7 +495,6 @@ function createLabelNode(){
     typeToggle,
     wake,
     destination,
-    directTo,
     assignedHeading,
     assignedSpeed,
     assignedVertical,
@@ -524,10 +520,10 @@ function createLabelNode(){
     updateLabelNode(node, node.track);
   });
 
-  directTo.addEventListener('click', event=>{
+  destination.addEventListener('click', event=>{
     event.preventDefault(); event.stopPropagation();
     if(!node.track) return;
-    showTrackPicker(node, directTo, 'track-picker--direct-to', (panel,close)=>{
+    showTrackPicker(node, destination, 'track-picker--direct-to', (panel,close)=>{
       buildDirectToPicker(panel,{track:node.track,index:node.navigationIndex,onChange:()=>updateLabelNode(node,node.track),close});
     });
   });
@@ -708,11 +704,9 @@ function updateLabelNode(node, track){
   node.typeToggle.classList.toggle('muted', false);
 
   node.wake.textContent = track.wake || '-';
-  node.destination.textContent = track.destination || track.exitPoint || '----';
   const target = navigationTarget(track);
-  node.directTo.textContent = target?.name || 'DCT';
-  node.directTo.dataset.empty = !target;
-  node.directTo.title = target ? `Direct to ${target.name} · click to reroute` : 'Direct to point';
+  node.destination.textContent = target?.name || track.destination || track.exitPoint || '----';
+  node.destination.title = target ? `Direct to ${target.name} · click to reroute` : 'Direct to point';
 
   const speedAssignment = normalizeSpeedAssignment(track);
   const verticalAssignment = normalizeVerticalAssignment(track, true);

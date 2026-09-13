@@ -239,7 +239,12 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290);
 
     // Direct-to works with the real navigation catalog and no flight plan.
-    await first.locator('.direct-to').click();
+    assert.equal(await first.locator('.row3 > *').count(),3,'reuse the existing point field without adding a label column');
+    assert.equal(await first.locator('.direct-to').count(),0,'no separate DCT control');
+    assert.equal(await first.locator('button.destination').textContent(),'EPKK');
+    await page.mouse.move(1090,690);
+    assert.equal(await first.locator('.destination').evaluate(el=>getComputedStyle(el).opacity),'1');
+    await first.locator('.destination').click();
     assert.equal(await page.locator('[value="rejoin"]').count(),0);
     assert(await page.getByRole('textbox',{name:'Direct-to point',exact:true}).evaluate(el=>el === document.activeElement));
     await page.keyboard.type('NOTAFIX'); await page.keyboard.press('Enter');
@@ -249,12 +254,13 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.keyboard.press('Enter');
     assert.equal(await page.locator('.track-picker').count(),0);
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.target.name),'ABAPA');
-    assert.equal(await first.locator('.direct-to').textContent(),'ABAPA');
+    assert.equal(await first.locator('.destination').textContent(),'ABAPA');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].assignedHeading),null);
     await first.locator('.assigned-heading').click();
     await page.keyboard.type('180'); await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo),null);
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].assignedHeading),180);
+    assert.equal(await first.locator('.destination').textContent(),'EPKK','cancel returns to the existing destination text');
 
     // Planned traffic is a test fixture only: the application demo stays planless.
     await page.evaluate(()=>{
@@ -263,13 +269,13 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       window.labelTest.setFlightPlan(t,[{name:'PAST',lon:-0.1,lat:0},{name:'FIRST',lon:0.1,lat:0},{name:'JOIN',lon:0.2,lat:0},{name:'LAST',lon:0.3,lat:0}],1);
       window.labelTest.render();
     });
-    await first.locator('.direct-to').click();
+    await first.locator('.destination').click();
     assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['2. FIRST','3. JOIN','4. LAST']);
     await page.locator('[data-plan-index="2"]').click();
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.planIndex),2);
     await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
-    assert.equal(await first.locator('.direct-to').textContent(),'LAST',JSON.stringify(await page.evaluate(()=>window.labelTest.tracks[0])));
-    await first.locator('.direct-to').click();
+    assert.equal(await first.locator('.destination').textContent(),'LAST',JSON.stringify(await page.evaluate(()=>window.labelTest.tracks[0])));
+    await first.locator('.destination').click();
     assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['4. LAST']);
     await page.keyboard.press('Escape');
 
@@ -279,7 +285,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       window.labelTest.navigationIndex.set('VIA',[{name:'VIA',lon:0.2,lat:0}]);
       window.labelTest.render();
     });
-    await first.locator('.direct-to').click();
+    await first.locator('.destination').click();
     await page.keyboard.type('VIA');
     await page.locator('input[value="rejoin"]').check();
     assert(await page.getByRole('textbox',{name:'Return to FPL point',exact:true}).evaluate(el=>el === document.activeElement));
@@ -287,8 +293,8 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.rejoinIndex),1);
     await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
-    assert.equal(await first.locator('.direct-to').textContent(),'JOIN');
-    await first.locator('.direct-to').click();
+    assert.equal(await first.locator('.destination').textContent(),'JOIN');
+    await first.locator('.destination').click();
     await page.getByRole('button',{name:'Cancel route · hold heading'}).click();
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
 
@@ -297,7 +303,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       const t=window.labelTest.tracks[0]; Object.assign(t,{lon:0,lat:0,heading:90});
       window.labelTest.setFlightPlan(t,[{name:'LATER',lon:1,lat:0}]); window.labelTest.render();
     });
-    await first.locator('.direct-to').click(); await page.keyboard.type('VIA');
+    await first.locator('.destination').click(); await page.keyboard.type('VIA');
     await page.getByRole('button',{name:'Fly direct',exact:true}).click();
     await page.evaluate(()=>{window.labelTest.advance(200); window.labelTest.render();});
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
@@ -307,7 +313,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     for(const size of [{width:1100,height:700},{width:360,height:480}]){
       await page.setViewportSize(size);
       await page.evaluate(()=>{const t=window.labelTest.tracks[0];t.labelOffset={x:0,y:0};t.labelSide='right';window.labelTest.render();});
-      await first.locator('.direct-to').click();
+      await first.locator('.destination').click();
       const box=await page.locator('.track-picker').boundingBox();
       assert(box.x>=0 && box.y>=0 && box.x+box.width<=size.width && box.y+box.height<=size.height);
       assert(await page.locator('.track-picker').evaluate(el=>el.scrollWidth<=el.clientWidth));
@@ -344,12 +350,12 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       }
     }
     const wizz = page.locator('.track-label').filter({has:page.locator('.callsign', {hasText:'WZZ1891'})});
-    await wizz.locator('.direct-to').click({force:true});
+    await wizz.locator('.destination').click({force:true});
     await page.keyboard.type('ABAPA');
     assert.equal(await page.locator('[data-point-name="ABAPA"]').count(),1,'live app receives navigation catalog');
     if(process.env.DIRECT_TO_SCREENSHOT) await page.screenshot({path:process.env.DIRECT_TO_SCREENSHOT});
     await page.keyboard.press('Enter');
-    assert.equal(await wizz.locator('.direct-to').textContent(),'ABAPA');
+    assert.equal(await wizz.locator('.destination').textContent(),'ABAPA');
     await wizz.locator('.assigned-heading').click({force:true});
     await page.keyboard.type('354'); await page.keyboard.press('Enter');
     assert.equal(await wizz.getAttribute('data-sectors'), 'E:HIGH');

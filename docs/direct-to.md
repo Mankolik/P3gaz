@@ -1,6 +1,6 @@
 # Direct-to navigation
 
-Hover over a track label and click **DCT** beside the destination. The point field is focused automatically. Type a waypoint or airport identifier from the loaded navigation data, then press Enter or choose **Fly direct**. Matching names appear below the field. Names are case-insensitive; unknown names are rejected, and duplicate names at different coordinates require selecting a location.
+Click the existing **destination/waypoint text** on a track label to open direct-to. The point field is focused automatically. Type a waypoint or airport identifier from the loaded navigation data, then press Enter or choose **Fly direct**. Matching names appear below the field. Names are case-insensitive; unknown names are rejected, and duplicate names at different coordinates require selecting a location.
 
 **End here · continue present heading** flies to the entered point, ends navigation there, and continues on the arrival heading. It does not stop or remove the aircraft and does not restore an earlier heading clearance. This option also suspends a track's existing flight plan.
 
@@ -10,7 +10,7 @@ For tracks with flight plans:
 - To reroute through a different point, type that point, select **Return to FPL point**, and type/select the remaining FPL point to rejoin. The aircraft flies to the entered point first, then to the selected FPL point, then follows the rest of the plan.
 - **Cancel route · hold heading**, or a new heading clearance, suspends navigation while preserving the flight plan and its progress. The DCT dropdown can issue a new shortcut to resume it.
 
-The active navigation point replaces DCT on the label and stays visible. The destination remains a separate field. Unassigned DCT is revealed on label hover without changing label geometry.
+The existing destination/waypoint field is the button; there is no additional DCT control. During navigation it shows the active waypoint. After navigation ends or is cancelled it returns to the track's destination/exit-point text. It remains visible without hovering, and hovering does not change label geometry.
 
 ## Dropdown typing
 
