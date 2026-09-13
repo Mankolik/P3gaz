@@ -230,6 +230,47 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     // Load the actual application, not just the focused fixture.
     await page.goto(origin + '/index.html');
     await page.waitForFunction(()=>document.querySelectorAll('.track-label').length > 0);
+    await page.waitForFunction(()=>[...document.querySelectorAll('.track-label')].every(label=>label.dataset.sectorStatus !== 'unknown'));
+    const wizz = page.locator('.track-label').filter({has:page.locator('.callsign', {hasText:'WZZ1891'})});
+    assert.equal(await wizz.getAttribute('data-sectors'), 'E:HIGH');
+    assert.match(await wizz.locator('.callsign').getAttribute('title'), /EPWW E HIGH.*FL365–660/);
+    const sectorPanel = page.locator('#track-sector-panel');
+    await wizz.hover({force:true});
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'WZZ1891');
+    await page.mouse.move(1090,690);
+    assert.equal(await sectorPanel.locator('.sector-panel__callsign').textContent(),'WZZ1891');
+    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW E HIGH/);
+    const panelBeforeDrag = await sectorPanel.boundingBox();
+    const panelHeader = await sectorPanel.locator('.sector-panel__header').boundingBox();
+    await page.mouse.move(panelHeader.x+30,panelHeader.y+12);
+    await page.mouse.down();
+    await page.mouse.move(panelHeader.x-70,panelHeader.y+92);
+    await page.mouse.up();
+    const panelAfterDrag = await sectorPanel.boundingBox();
+    assert.equal(panelAfterDrag.x,panelBeforeDrag.x-100);
+    assert.equal(panelAfterDrag.y,panelBeforeDrag.y+80);
+    assert.equal(await sectorPanel.getAttribute('data-track-id'),'WZZ1891');
+    await page.evaluate(()=>{
+      const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+      track.actualFlightLevel=360;
+      track.clearedFlightLevel=360;
+    });
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
+    await page.evaluate(()=>{
+      const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
+      track.lon=0; track.lat=0; track.groundSpeed=0; track.assignedSpeed=null;
+    });
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.sectorStatus === 'outside');
+    const lot = page.locator('.track-label').filter({has:page.locator('.callsign',{hasText:'LOT612'})});
+    await lot.hover({force:true});
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'LOT612');
+    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW F LOW/);
+    await page.setViewportSize({width:800,height:600});
+    await page.waitForFunction(()=>{
+      const r = document.querySelector('#track-sector-panel').getBoundingClientRect();
+      return r.x >= 0 && r.y >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+    });
+    console.log('PASS: last-hovered sector window, dragging, live altitude/position changes, track switching, and resize bounds');
     assert.equal(errors.length,0,errors.join('\n'));
     console.log('PASS: application boots and renders live traffic without JavaScript errors');
     if(process.env.LABEL_SCREENSHOT) await page.screenshot({path:process.env.LABEL_SCREENSHOT});

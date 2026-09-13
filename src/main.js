@@ -13,6 +13,8 @@ import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
 import { createDemoTracks } from './radar/tracks.js';
 import { updateTrackMovement } from './radar/movement.js';
+import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
+import { mountSectorPanel } from './ui/panels/sector-panel.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -43,6 +45,7 @@ async function bootstrap(){
   createTick(bus);
   bus.on('tick', dt=>{
     updateTrackMovement(state, dt);
+    updateTrackSectors(state);
     drawFrame(canvas, camera, state, overlayEl);
   });
 
@@ -50,6 +53,7 @@ async function bootstrap(){
 
   const topbarEl = document.getElementById('topbar');
   if(topbarEl) mountTopbar(topbarEl, state, bus);
+  mountSectorPanel(mainEl, overlayEl, state);
 
   bus.on('ui:changed', ()=>saveConfig(state));
 
@@ -71,6 +75,11 @@ async function loadDatasets(state, camera, canvasEl){
       }
     }
     const project = createSharedProjection(loaded);
+    const isSector = entry=>entry.layer === 'SECTOR_LOW' || entry.layer === 'SECTOR_HIGH';
+    const sectorDatasets = loaded.filter(({entry})=>isSector(entry));
+    state.air.sectorIndex = createSectorIndex(sectorDatasets.map(({data})=>data), {
+      complete:sectorDatasets.length === entries.filter(isSector).length,
+    });
     state.map.project = project;
     let epwwBounds = null;
     for(const {entry, data} of loaded){
@@ -98,6 +107,7 @@ async function loadDatasets(state, camera, canvasEl){
       }
     }
     state.air.tracks = createDemoTracks(project);
+    updateTrackSectors(state);
 
     fitAll(state, camera, canvasEl);
     if(epwwBounds) fitBounds(camera, canvasEl, epwwBounds, 80);

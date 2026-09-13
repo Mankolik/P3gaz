@@ -1,4 +1,5 @@
 import { parseSpeedInstruction } from '../utils/speed.js';
+import { sectorMembershipTitle } from '../radar/sectors.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -516,6 +517,10 @@ function createLabelNode(){
     updateLabelNode(node, node.track);
   });
 
+  root.addEventListener('pointerenter', ()=>{
+    if(node.track) root.dispatchEvent(new CustomEvent('track-hover', { bubbles:true, detail:{track:node.track} }));
+  });
+
   typeToggle.addEventListener('click', evt=>{
     evt.preventDefault();
     evt.stopPropagation();
@@ -660,6 +665,9 @@ function updateLabelNode(node, track){
   }
 
   node.callsign.textContent = track.callsign || 'UNKNOWN';
+  node.callsign.title = sectorMembershipTitle(track.sectorMembership);
+  node.root.dataset.sectors = (track.sectorMembership?.sectors || []).map(sector=>sector.id).join(' ');
+  node.root.dataset.sectorStatus = track.sectorMembership?.status || 'unknown';
 
   const showGs = track.showGroundSpeed !== false;
   let speedLabel = null;
