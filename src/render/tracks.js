@@ -1,5 +1,7 @@
 import { parseSpeedInstruction } from '../utils/speed.js';
 import { sectorMembershipTitle } from '../radar/sectors.js';
+import { assignHeading, navigationTarget } from '../radar/routes.js';
+import { buildDirectToPicker } from '../ui/direct-to-picker.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -459,9 +461,10 @@ function createLabelNode(){
   typeToggle.className = 'toggle type muted';
   const wake = document.createElement('span');
   wake.className = 'wake';
-  const destination = document.createElement('span');
+  const destination = document.createElement('button');
+  destination.type = 'button';
   destination.className = 'destination muted';
-
+  destination.setAttribute('aria-label','Direct to point');
   row3.append(typeToggle, wake, destination);
 
   const assignedHeading = document.createElement('span');
@@ -515,6 +518,14 @@ function createLabelNode(){
     if(!node.track) return;
     node.track.showGroundSpeed = !node.track.showGroundSpeed;
     updateLabelNode(node, node.track);
+  });
+
+  destination.addEventListener('click', event=>{
+    event.preventDefault(); event.stopPropagation();
+    if(!node.track) return;
+    showTrackPicker(node, destination, 'track-picker--direct-to', (panel,close)=>{
+      buildDirectToPicker(panel,{track:node.track,index:node.navigationIndex,onChange:()=>updateLabelNode(node,node.track),close});
+    });
   });
 
   root.addEventListener('pointerenter', ()=>{
@@ -693,7 +704,9 @@ function updateLabelNode(node, track){
   node.typeToggle.classList.toggle('muted', false);
 
   node.wake.textContent = track.wake || '-';
-  node.destination.textContent = track.destination || track.exitPoint || '----';
+  const target = navigationTarget(track);
+  node.destination.textContent = target?.name || track.destination || track.exitPoint || '----';
+  node.destination.title = target ? `Direct to ${target.name} · click to reroute` : 'Direct to point';
 
   const speedAssignment = normalizeSpeedAssignment(track);
   const verticalAssignment = normalizeVerticalAssignment(track, true);
@@ -764,7 +777,7 @@ function positionLabel(node, track, screen){
   return { x: anchorX, y: anchorY };
 }
 
-export function syncTrackLabels(overlay, projected){
+export function syncTrackLabels(overlay, projected, navigationIndex){
   if(!overlay) return new Map();
   const cache = ensureOverlayCache(overlay);
   const anchors = new Map();
@@ -785,6 +798,7 @@ export function syncTrackLabels(overlay, projected){
       }
     }
     const anchor = positionLabel(node, track, item);
+    node.navigationIndex = navigationIndex;
     anchors.set(track.id, anchor);
   }
   for(const [id, node] of cache){
@@ -809,6 +823,7 @@ function closeActivePicker(){
   if(picker.node){
     picker.node.activePicker = null;
   }
+  picker.resizeObserver?.disconnect();
   picker.panel?.remove();
 }
 
@@ -837,7 +852,6 @@ function showTrackPicker(node, anchor, className, build){
   document.body.appendChild(panel);
   positionTrackPicker(panel, anchor);
   scrollPickerToCurrentValue(panel);
-  panel.focus?.();
   const handlePointerDown = evt=>{
     if(panel.contains(evt.target) || anchor.contains(evt.target)) return;
     closeActivePicker();
@@ -849,8 +863,13 @@ function showTrackPicker(node, anchor, className, build){
   };
   document.addEventListener('pointerdown', handlePointerDown, true);
   document.addEventListener('keydown', handleKeyDown, true);
-  activeTrackPicker = { panel, node, anchor, handlePointerDown, handleKeyDown };
+  const resizeObserver = new ResizeObserver(()=>positionTrackPicker(panel,anchor));
+  resizeObserver.observe(panel);
+  activeTrackPicker = { panel, node, anchor, handlePointerDown, handleKeyDown, resizeObserver };
   node.activePicker = panel;
+  const input = panel.querySelector('input:not([type="radio"]):not([type="checkbox"]):not([disabled])');
+  input?.focus({preventScroll:true});
+  input?.select();
 }
 
 function positionTrackPicker(panel, anchor){
@@ -979,7 +998,7 @@ function openHeadingPicker(node, anchor){
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
-        track.assignedHeading = value;
+        assignHeading(track, value);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         close();
@@ -998,13 +1017,13 @@ function openHeadingPicker(node, anchor){
         const parsed = parseInt(raw, 10);
         if(!Number.isFinite(parsed)) return false;
         const normalized = ((parsed % 360) + 360) % 360;
-        track.assignedHeading = normalized;
+        assignHeading(track, normalized);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         return true;
       },
       onClear: ()=>{
-        track.assignedHeading = null;
+        assignHeading(track);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
       },
@@ -1310,13 +1329,8 @@ function createLevelEditor(field, track, node, close, options){
     list.appendChild(option);
   });
 
-  input.addEventListener('change', ()=>{
-    if(!applyValue(input.value)){
-      refresh();
-    }else if(closeOnSelect && typeof close === 'function'){
-      close();
-    }
-  });
+  // Apply only with Enter or an option click; autofocus must not turn an
+  // outside click/Escape into an accidental clearance through blur/change.
   input.addEventListener('keydown', evt=>{
     if(evt.key === 'Enter'){
       evt.preventDefault();

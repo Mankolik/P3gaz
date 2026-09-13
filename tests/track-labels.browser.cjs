@@ -11,12 +11,15 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
   <div id="track-overlay"></div><script type="module">
   import { syncTrackLabels } from '/src/render/tracks.js';
   import { createDemoTracks } from '/src/radar/tracks.js';
+  import { createNavigationIndex, setFlightPlan } from '/src/radar/routes.js';
+  import { updateTrackMovement } from '/src/radar/movement.js';
   const tracks = createDemoTracks();
+  const navigationIndex = createNavigationIndex([await (await fetch('/assets/geojson/pl_enr4_4_waypoints.geojson')).json()]);
   tracks.forEach(track=>{ track.labelOffset = {x:40,y:0}; });
-  window.labelTest = { tracks, render(){
+  window.labelTest = { tracks, navigationIndex, setFlightPlan, advance(seconds){updateTrackMovement({air:{tracks}},seconds);}, render(){
     syncTrackLabels(document.querySelector('#track-overlay'), tracks.map((track, i)=>({
-      track, x:150 + (i % 3) * 330, y:100 + Math.floor(i / 3) * 150, zoom:1
-    })));
+      track, x:150 + (i % 3) * 370, y:100 + Math.floor(i / 3) * 150, zoom:1
+    })),navigationIndex);
   }};
   window.labelTest.render();
   </script>`;
@@ -165,6 +168,9 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     for(const field of ['assigned-heading','assigned-speed','assigned-vertical','assigned-ecl']){
       await first.locator('.'+field).click();
       assert.equal(await page.locator('.track-picker').count(),1);
+      assert(await page.locator('.track-picker input').evaluate(el=>el === document.activeElement),'picker focuses the editable input');
+      await page.keyboard.type('123');
+      assert.equal(await page.locator('.track-picker input').inputValue(),'123','typing immediately replaces the selected value');
       await page.mouse.click(1090,690);
       assert.equal(await page.locator('.track-picker').count(),0);
     }
@@ -220,6 +226,102 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.keyboard.press('Escape');
     console.log('PASS: pickers open at exact or nearest assignments, levels descend, and empty assignments start at the top');
 
+    // Focused level entry supports typing/Enter and cancelling without blur commits.
+    const oldLevel=await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel);
+    await first.locator('.level-primary button').click();
+    await page.keyboard.type('290');
+    assert.equal(await page.locator('.track-picker input').inputValue(),'290');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),oldLevel);
+    await first.locator('.level-primary button').click();
+    await page.keyboard.type('290');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290);
+
+    // Direct-to works with the real navigation catalog and no flight plan.
+    assert.equal(await first.locator('.row3 > *').count(),3,'reuse the existing point field without adding a label column');
+    assert.equal(await first.locator('.direct-to').count(),0,'no separate DCT control');
+    assert.equal(await first.locator('button.destination').textContent(),'EPKK');
+    await page.mouse.move(1090,690);
+    assert.equal(await first.locator('.destination').evaluate(el=>getComputedStyle(el).opacity),'1');
+    await first.locator('.destination').click();
+    assert.equal(await page.locator('[value="rejoin"]').count(),0);
+    assert(await page.getByRole('textbox',{name:'Direct-to point',exact:true}).evaluate(el=>el === document.activeElement));
+    await page.keyboard.type('NOTAFIX'); await page.keyboard.press('Enter');
+    assert.match(await page.locator('.direct-to__error').textContent(),/known point/);
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo),null);
+    await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.type('abapa');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('.track-picker').count(),0);
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.target.name),'ABAPA');
+    assert.equal(await first.locator('.destination').textContent(),'ABAPA');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].assignedHeading),null);
+    await first.locator('.assigned-heading').click();
+    await page.keyboard.type('180'); await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo),null);
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].assignedHeading),180);
+    assert.equal(await first.locator('.destination').textContent(),'EPKK','cancel returns to the existing destination text');
+
+    // Planned traffic is a test fixture only: the application demo stays planless.
+    await page.evaluate(()=>{
+      const t=window.labelTest.tracks[0];
+      Object.assign(t,{lon:0,lat:0,heading:90,groundSpeed:360,assignedSpeed:null});
+      window.labelTest.setFlightPlan(t,[{name:'PAST',lon:-0.1,lat:0},{name:'FIRST',lon:0.1,lat:0},{name:'JOIN',lon:0.2,lat:0},{name:'LAST',lon:0.3,lat:0}],1);
+      window.labelTest.render();
+    });
+    await first.locator('.destination').click();
+    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['2. FIRST','3. JOIN','4. LAST']);
+    await page.locator('[data-plan-index="2"]').click();
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.planIndex),2);
+    await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
+    assert.equal(await first.locator('.destination').textContent(),'LAST',JSON.stringify(await page.evaluate(()=>window.labelTest.tracks[0])));
+    await first.locator('.destination').click();
+    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['4. LAST']);
+    await page.keyboard.press('Escape');
+
+    await page.evaluate(()=>{
+      const t=window.labelTest.tracks[0]; Object.assign(t,{lon:0,lat:0,heading:90});
+      window.labelTest.setFlightPlan(t,[{name:'SKIP',lon:0.1,lat:0},{name:'JOIN',lon:0.3,lat:0},{name:'LAST',lon:0.4,lat:0}]);
+      window.labelTest.navigationIndex.set('VIA',[{name:'VIA',lon:0.2,lat:0}]);
+      window.labelTest.render();
+    });
+    await first.locator('.destination').click();
+    await page.keyboard.type('VIA');
+    await page.locator('input[value="rejoin"]').check();
+    assert(await page.getByRole('textbox',{name:'Return to FPL point',exact:true}).evaluate(el=>el === document.activeElement));
+    await page.keyboard.type('JOIN');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.rejoinIndex),1);
+    await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
+    assert.equal(await first.locator('.destination').textContent(),'JOIN');
+    await first.locator('.destination').click();
+    await page.getByRole('button',{name:'Cancel route · hold heading'}).click();
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
+
+    // Choosing End here on a planned track does not resume it or delete the track.
+    await page.evaluate(()=>{
+      const t=window.labelTest.tracks[0]; Object.assign(t,{lon:0,lat:0,heading:90});
+      window.labelTest.setFlightPlan(t,[{name:'LATER',lon:1,lat:0}]); window.labelTest.render();
+    });
+    await first.locator('.destination').click(); await page.keyboard.type('VIA');
+    await page.getByRole('button',{name:'Fly direct',exact:true}).click();
+    await page.evaluate(()=>{window.labelTest.advance(200); window.labelTest.render();});
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks.length),5);
+    assert((await page.evaluate(()=>window.labelTest.tracks[0].lon))>0.3);
+
+    for(const size of [{width:1100,height:700},{width:360,height:480}]){
+      await page.setViewportSize(size);
+      await page.evaluate(()=>{const t=window.labelTest.tracks[0];t.labelOffset={x:0,y:0};t.labelSide='right';window.labelTest.render();});
+      await first.locator('.destination').click();
+      const box=await page.locator('.track-picker').boundingBox();
+      assert(box.x>=0 && box.y>=0 && box.x+box.width<=size.width && box.y+box.height<=size.height);
+      assert(await page.locator('.track-picker').evaluate(el=>el.scrollWidth<=el.clientWidth));
+      await page.keyboard.press('Escape');
+    }
+    await page.setViewportSize({width:1100,height:700});
+    console.log('PASS: immediate typing, direct-to catalog validation, FPL shortcuts/rejoin, end-here, heading override, and narrow direct-to picker');
+
     if(process.env.LABEL_DETAIL_SCREENSHOT){
       await page.mouse.click(1090,690);
       await page.screenshot({path:process.env.LABEL_DETAIL_SCREENSHOT});
@@ -231,7 +333,31 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.goto(origin + '/index.html');
     await page.waitForFunction(()=>document.querySelectorAll('.track-label').length > 0);
     await page.waitForFunction(()=>[...document.querySelectorAll('.track-label')].every(label=>label.dataset.sectorStatus !== 'unknown'));
+    for(const label of ['Range','QL SC','FPL','MAP','CONFIG']){
+      const dropdown=page.locator('.topgroup').filter({has:page.locator(':scope > .label',{hasText:new RegExp('^'+label+'$')})}).locator('.dropdown');
+      await dropdown.locator(':scope > .value').click();
+      const input=dropdown.locator('.dropdown-search');
+      assert(await input.evaluate(el=>el === document.activeElement),label+' focuses search');
+      await page.keyboard.type(label === 'Range' ? '80' : 'zzzz');
+      if(label === 'Range'){
+        await page.keyboard.press('Enter');
+        assert.equal(await dropdown.locator(':scope > .value').textContent(),'80 NM');
+        assert.equal(await dropdown.evaluate(el=>el.classList.contains('open')),false);
+      }else{
+        assert.equal(await dropdown.locator('.option:visible,.row:visible').count(),0);
+        await page.keyboard.press('Escape');
+        assert.equal(await dropdown.evaluate(el=>el.classList.contains('open')),false);
+      }
+    }
     const wizz = page.locator('.track-label').filter({has:page.locator('.callsign', {hasText:'WZZ1891'})});
+    await wizz.locator('.destination').click({force:true});
+    await page.keyboard.type('ABAPA');
+    assert.equal(await page.locator('[data-point-name="ABAPA"]').count(),1,'live app receives navigation catalog');
+    if(process.env.DIRECT_TO_SCREENSHOT) await page.screenshot({path:process.env.DIRECT_TO_SCREENSHOT});
+    await page.keyboard.press('Enter');
+    assert.equal(await wizz.locator('.destination').textContent(),'ABAPA');
+    await wizz.locator('.assigned-heading').click({force:true});
+    await page.keyboard.type('354'); await page.keyboard.press('Enter');
     assert.equal(await wizz.getAttribute('data-sectors'), 'E:HIGH');
     assert.match(await wizz.locator('.callsign').getAttribute('title'), /EPWW E HIGH.*FL365–FL660/);
     const sectorPanel = page.locator('#track-sector-panel');

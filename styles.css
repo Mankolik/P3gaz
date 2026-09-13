@@ -7,9 +7,9 @@
 }
 *{ box-sizing:border-box }
 html,body{ height:100%; margin:0; background:var(--bg); color:var(--text); font:14px/1.35 'Aldrich', system-ui, -apple-system, 'Segoe UI', Roboto; overflow:hidden }
-#app{ display:grid; grid-template-rows:48px 1fr auto; height:100%; width:100vw; min-height:100svh }
+#app{ display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:100%; width:100vw; min-height:100svh }
 /* TOP BAR */
-header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--stroke); flex-wrap:wrap }
+header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--stroke); flex-wrap:wrap }
 .topgroup{ display:flex; align-items:center; gap:6px; padding:4px 6px; background:var(--panel-2); border:1px solid var(--stroke); border-radius:10px }
 .label{ color:var(--text-dim); font-size:12px }
 .dropdown,.info,.input{ height:30px; display:flex; align-items:center; gap:6px; padding:0 10px; border:1px solid var(--stroke); border-radius:8px; background:#0b1117; }
@@ -82,6 +82,26 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .row4 span[data-empty="true"],
 .track-label .row4 .assigned-ecl{ opacity:0; }
 .track-label:hover .row4 span{ opacity:1; }
+
+.track-label .destination{ appearance:none; margin:0; padding:0; border:0; border-radius:3px; background:transparent; font:inherit; letter-spacing:inherit; cursor:pointer; }
+.track-label .destination:hover{ background:rgba(255,255,255,.1); }
+.track-label .destination:focus-visible{ outline:1px solid currentColor; outline-offset:1px; }
+.track-picker.track-picker--direct-to{ width:300px; min-width:0; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow-y:auto; }
+.direct-to__input,.dropdown-search{ min-width:0; width:100%; background:#101820; border:1px solid #233242; border-radius:6px; padding:6px 8px; color:var(--text); font:inherit; }
+.direct-to__input{ text-transform:uppercase; }
+.direct-to__hint{ color:var(--text-dim); font-size:11px; }
+.track-picker .direct-to__points{ max-height:130px; flex-shrink:0; }
+.direct-to__after{ margin:0; padding:6px; border:1px solid var(--stroke); border-radius:6px; min-width:0; }
+.direct-to__after legend{ color:var(--text-dim); font-size:11px; }
+.direct-to__choice{ display:flex; align-items:center; gap:5px; padding:3px 0; font-size:11px; cursor:pointer; }
+.direct-to__choice input{ margin:0; }
+.track-picker .direct-to__return-points{ max-height:72px; margin-top:4px; }
+.direct-to__error{ color:#ff9292; font-size:11px; }
+.direct-to__error:empty{ display:none; }
+.direct-to__actions{ display:flex; flex-direction:column; gap:4px; }
+button.direct-to__apply{ background:#15372c; border-color:#276348; text-align:center; }
+.dropdown-search{ margin-bottom:6px; }
+.dropdown-panel [hidden]{ display:none !important; }
 
 .track-picker{ background:#0b1117; border:1px solid var(--stroke); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; min-width:160px; max-width:220px; max-height:280px; box-shadow:0 12px 28px rgba(0,0,0,.45); color:var(--text); font-size:12px; }
 .track-picker__options{ display:flex; flex-direction:column; gap:4px; max-height:170px; overflow-y:auto; padding-right:4px; }

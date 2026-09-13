@@ -89,8 +89,7 @@ export function mountTopbar(root, state, bus){
       if((opt.value??opt)===initial) o.classList.add('active');
       o.onclick=()=>{ selectOnly(o); val.textContent=opt.label??String(opt); onPick(opt.value??opt); dd.classList.remove('open'); bus.emit('ui:changed'); };
     });
-    dd.addEventListener('click', (e)=>{ e.stopPropagation(); root.querySelectorAll('.dropdown').forEach(x=>x!==dd&&x.classList.remove('open')); dd.classList.toggle('open'); });
-    document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
+    attachOpenClose(dd);
     return dd;
   }
   function toggleText(initial, onChange){
@@ -109,7 +108,47 @@ export function mountTopbar(root, state, bus){
     field.append(inp); field.set=v=>{ inp.value=pad3(clampInt(v,0,990)); }; return field;
   }
   function attachOpenClose(dd){
-    dd.addEventListener('click', (e)=>{ e.stopPropagation(); root.querySelectorAll('.dropdown').forEach(o=>{ if(o!==dd) o.classList.remove('open'); }); dd.classList.toggle('open'); });
+    const panel=dd.querySelector('.dropdown-panel');
+    const search=el('input','dropdown-search');
+    search.type='text'; search.placeholder='Type to filter'; search.setAttribute('aria-label','Filter menu');
+    panel.prepend(search);
+    const options=()=>[...panel.querySelectorAll(':scope > .option, :scope > .row')];
+    search.addEventListener('input',()=>{
+      const query=search.value.trim().toLowerCase();
+      options().forEach(option=>{ option.hidden=!option.textContent.toLowerCase().includes(query); });
+    });
+    search.addEventListener('keydown',event=>{
+      if(event.key === 'Enter'){
+        event.preventDefault();
+        const option=options().find(option=>!option.hidden);
+        (option?.querySelector('.textbtn') || option)?.click();
+      }
+      event.stopPropagation();
+    });
+    dd.tabIndex=0;
+    const toggle=()=>{
+      root.querySelectorAll('.dropdown').forEach(o=>{ if(o!==dd) o.classList.remove('open'); });
+      dd.classList.toggle('open');
+      if(dd.classList.contains('open')){
+        search.value=''; options().forEach(option=>{ option.hidden=false; });
+        panel.style.left=`${Math.min(0,window.innerWidth-dd.getBoundingClientRect().left-panel.offsetWidth-8)}px`;
+        panel.style.maxHeight=`${Math.max(80,window.innerHeight-dd.getBoundingClientRect().bottom-14)}px`;
+        panel.style.overflowY='auto';
+        search.focus({preventScroll:true}); search.select();
+      }
+    };
+    dd.addEventListener('click',event=>{
+      event.stopPropagation();
+      if(!panel.contains(event.target)) toggle();
+    });
+    dd.addEventListener('keydown',event=>{
+      if(event.target === dd && ['Enter',' '].includes(event.key)){ event.preventDefault(); toggle(); }
+    });
+    // Capture Escape before input handlers stop it; edits remain unapplied.
+    dd.addEventListener('keydown',event=>{
+      if(event.key === 'Escape'){ event.preventDefault(); dd.classList.remove('open'); dd.focus({preventScroll:true}); }
+    },true);
+    document.addEventListener('pointerdown',event=>{ if(!dd.contains(event.target)) dd.classList.remove('open'); });
   }
   function clampInt(v, lo, hi){ v=parseInt(v,10); if(!Number.isFinite(v)) return lo; return Math.max(lo, Math.min(hi, v)); }
   function pad3(n){ n=parseInt(n,10); if(!Number.isFinite(n)) n=0; return String(Math.max(0, Math.min(990, n))).padStart(3,'0'); }

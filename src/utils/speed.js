@@ -81,6 +81,7 @@ export function convertMachToTas(mach, altitudeFt){
 
 export function parseSpeedInstruction(input, defaultMode='IAS'){
   const modeHint = (defaultMode || 'IAS').toUpperCase() === 'MACH' ? 'Mach' : (defaultMode || 'IAS').toUpperCase() === 'MN' ? 'Mach' : 'IAS';
+  if(input == null) return {mode:modeHint,value:null};
   if(input && typeof input === 'object' && !Array.isArray(input)){
     const modeRaw = input.mode || modeHint;
     const normalizedMode = String(modeRaw).toUpperCase().startsWith('M') ? 'Mach' : 'IAS';

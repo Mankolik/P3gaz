@@ -15,6 +15,7 @@ import { createDemoTracks } from './radar/tracks.js';
 import { updateTrackMovement } from './radar/movement.js';
 import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
+import { createNavigationIndex } from './radar/routes.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -81,6 +82,7 @@ async function loadDatasets(state, camera, canvasEl){
       complete:sectorDatasets.length === entries.filter(isSector).length,
     });
     state.map.project = project;
+    state.air.navigationIndex = createNavigationIndex(loaded.filter(({entry})=>['WAYPOINTS','AIRPORTS'].includes(entry.layer)).map(({data})=>data));
     let epwwBounds = null;
     for(const {entry, data} of loaded){
       const features = normalizeGeoJSON(data, project);
