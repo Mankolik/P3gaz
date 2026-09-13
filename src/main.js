@@ -75,7 +75,7 @@ async function loadDatasets(state, camera, canvasEl){
       }
     }
     const project = createSharedProjection(loaded);
-    const isSector = entry=>entry.layer === 'SECTOR_LOW' || entry.layer === 'SECTOR_HIGH';
+    const isSector = entry=>['SECTOR_LOW','SECTOR_HIGH','TMA'].includes(entry.layer);
     const sectorDatasets = loaded.filter(({entry})=>isSector(entry));
     state.air.sectorIndex = createSectorIndex(sectorDatasets.map(({data})=>data), {
       complete:sectorDatasets.length === entries.filter(isSector).length,

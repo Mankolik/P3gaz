@@ -2,6 +2,15 @@
 // Vertical bands include their floor and exclude their ceiling.
 const EDGE_EPSILON = 1e-9;
 
+function altitudeToFl(altitude){
+  if(!Number.isFinite(altitude?.value)) return null;
+  if(altitude.unit === 'FL' && altitude.ref === 'STD') return altitude.value;
+  // The simulator has no QNH model. Use its existing standard-pressure
+  // approximation for AMSL feet, retaining original units for display.
+  if(altitude.unit === 'FT' && ['AMSL','STD'].includes(altitude.ref)) return altitude.value / 100;
+  return null;
+}
+
 function compilePolygon(rings){
   if(!Array.isArray(rings) || !rings.length) return null;
   const bounds = { minLon:Infinity, maxLon:-Infinity, minLat:Infinity, maxLat:-Infinity };
@@ -31,19 +40,30 @@ export function createSectorIndex(collections, { complete = true } = {}){
       const coordinates = geometry?.type === 'Polygon' ? [geometry.coordinates]
         : geometry?.type === 'MultiPolygon' ? geometry.coordinates : [];
       const polygons = Array.isArray(coordinates) ? coordinates.map(compilePolygon) : [];
-      if(!props?.sector || !props?.vertical || !Number.isFinite(props.min_fl)
-        || !Number.isFinite(props.max_fl) || props.max_fl <= props.min_fl
+      const isTma = !!props?.tma;
+      const bands = isTma
+        ? (Array.isArray(props.vertical_bands) ? props.vertical_bands.map(band=>({
+          minFl:altitudeToFl(band?.floor), maxFl:altitudeToFl(band?.ceiling),
+          floor:band?.floor, ceiling:band?.ceiling,
+        })) : [])
+        : [{minFl:props?.min_fl, maxFl:props?.max_fl}];
+      if(!props?.sector || (isTma ? !props.icao : !props.vertical)
+        || !bands.length || bands.some(band=>!Number.isFinite(band.minFl) || !Number.isFinite(band.maxFl) || band.maxFl <= band.minFl)
         || !polygons.length || polygons.some(polygon=>!polygon)){
         complete = false;
         continue;
       }
       const code = String(props.sector);
-      const vertical = String(props.vertical);
-      sectors.push({
-        id:`${code}:${vertical}`, code, vertical,
-        name:props.name || `${code} ${vertical}`,
-        minFl:props.min_fl, maxFl:props.max_fl, polygons,
-      });
+      const vertical = isTma ? (code === 'UTMA' ? 'UTMA' : 'TMA') : String(props.vertical);
+      const id = isTma ? `TMA:${props.icao}:${props.tma_id || `${props.tma}:${code}`}` : `${code}:${vertical}`;
+      const name = isTma ? `${props.tma}${['UTMA','TMA'].includes(code) ? '' : ` ${code}`}` : (props.name || `${code} ${vertical}`);
+      bands.forEach((band, bandIndex)=>sectors.push({
+        id:bands.length > 1 ? `${id}:${bandIndex}` : id, code, vertical, name,
+        kind:isTma ? 'TMA' : 'ACC',
+        // Local terminal volumes mask broad UTMAs where both match in 3D.
+        priority:isTma ? (vertical === 'UTMA' ? 1 : 2) : 0,
+        ...band, polygons,
+      }));
     }
   }
   sectors.sort((a,b)=>a.id.localeCompare(b.id));
@@ -92,7 +112,8 @@ export function resolveTrackSectors(index, track){
     const { polygons, ...membership } = sector;
     matches.set(sector.id, membership);
   }
-  const sectors = [...matches.values()];
+  const highestPriority = Math.max(-1, ...[...matches.values()].map(sector=>sector.priority));
+  const sectors = [...matches.values()].filter(sector=>sector.priority === highestPriority);
   return { status:sectors.length ? 'inside' : 'outside', sectors };
 }
 
@@ -111,6 +132,13 @@ export function updateTrackSectors(state){
 export function sectorMembershipTitle(membership){
   if(!membership || membership.status === 'unknown') return 'Sector: unavailable';
   if(membership.status === 'outside') return 'Sector: outside loaded sector limits';
-  const names = membership.sectors.map(sector=>`${sector.name} (FL${String(sector.minFl).padStart(3,'0')}–${sector.maxFl})`);
+  const names = membership.sectors.map(sector=>`${sector.name} (${sectorLimitsText(sector)})`);
   return `${names.length > 1 ? 'Sectors (boundary/overlap)' : 'Sector'}: ${names.join(' | ')}`;
+}
+
+export function sectorLimitsText(sector){
+  const format = (altitude, fallbackFl)=>altitude?.unit === 'FT'
+    ? `${altitude.value} FT ${altitude.ref}`
+    : `FL${String(altitude?.value ?? fallbackFl).padStart(3,'0')}`;
+  return `${format(sector.floor,sector.minFl)}–${format(sector.ceiling,sector.maxFl)}`;
 }
