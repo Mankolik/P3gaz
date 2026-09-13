@@ -176,6 +176,57 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     assert.deepEqual(await page.evaluate(()=>window.labelTest.tracks[0].labelOffset), {x:98,y:10});
     console.log('PASS: speed/type toggles, heading/speed/rate/ECL pickers, outside dismissal, and label dragging');
 
+    // Open around the assignment, including manual values between presets.
+    for(const [selector, assignments, nearest, exact] of [
+      ['.assigned-heading', {assignedHeading:180}, 180, true],
+      ['.assigned-heading', {assignedHeading:354}, 355, false],
+      ['.assigned-speed', {assignedSpeed:{mode:'IAS',value:280}}, 280, true],
+      ['.assigned-speed', {assignedSpeed:{mode:'IAS',value:277}}, 280, false],
+      ['.assigned-speed', {assignedSpeed:{mode:'Mach',value:0.78}}, 0.78, true],
+      ['.assigned-vertical', {assignedVertical:{value:-1500,comparator:'exact'},verticalRateAssigned:true}, -1500, true],
+      ['.assigned-vertical', {assignedVertical:{value:0,comparator:'exact'},verticalRateAssigned:true}, 0, true],
+      ['.level-primary button', {clearedFlightLevel:380}, 380, true],
+      ['.level-primary button', {clearedFlightLevel:275}, 280, false],
+      ['.level-exit button', {exitFlightLevel:600}, 600, true],
+      ['.level-exit button', {exitFlightLevel:0}, 0, true],
+      ['.assigned-ecl', {expectedCruiseLevel:350}, 350, true],
+    ]){
+      await page.evaluate(assignments=>{
+        Object.assign(window.labelTest.tracks[0], assignments);
+        window.labelTest.tracks[0].labelRevision++;
+        window.labelTest.render();
+      }, assignments);
+      await first.locator(selector).click();
+      const list = page.locator('.track-picker__options');
+      const target = list.locator(`[data-value="${nearest}"]`);
+      const listBox = await list.boundingBox();
+      const targetBox = await target.boundingBox();
+      assert(targetBox.y >= listBox.y - 1 && targetBox.y + targetBox.height <= listBox.y + listBox.height + 1, `${selector} opens at ${nearest}`);
+      assert.equal(await list.locator('.selected').count(), exact ? 1 : 0, 'nearest preset must not replace manual selection');
+      if(selector.includes('level-') || selector === '.assigned-ecl'){
+        const values = await list.locator('[data-value]').evaluateAll(options=>options.map(option=>Number(option.dataset.value)));
+        assert.equal(values[0], 600);
+        assert.equal(values.at(-1), 0);
+        assert(values.every((value,i)=>i === 0 || value < values[i-1]), 'levels descend');
+      }
+      await page.keyboard.press('Escape');
+    }
+    // An unassigned level starts at the highest preset rather than stale scroll.
+    await first.locator('.level-exit button').click();
+    await page.locator('.track-picker__clear').click();
+    await first.locator('.level-exit button').click();
+    assert.equal(await page.locator('.track-picker__options').evaluate(el=>el.scrollTop), 0);
+    assert.equal(await page.locator('.track-picker__option.selected').count(), 0);
+    await page.keyboard.press('Escape');
+    console.log('PASS: pickers open at exact or nearest assignments, levels descend, and empty assignments start at the top');
+
+    if(process.env.LABEL_DETAIL_SCREENSHOT){
+      await page.mouse.click(1090,690);
+      await page.screenshot({path:process.env.LABEL_DETAIL_SCREENSHOT});
+      await labels.nth(1).hover();
+      await page.screenshot({path:process.env.LABEL_DETAIL_SCREENSHOT.replace('.png','-hover.png')});
+    }
+
     // Load the actual application, not just the focused fixture.
     await page.goto(origin + '/index.html');
     await page.waitForFunction(()=>document.querySelectorAll('.track-label').length > 0);

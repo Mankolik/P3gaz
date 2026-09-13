@@ -37,10 +37,10 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .toggle:hover{ background:rgba(255,255,255,.08); }
 .track-label .row2{ gap:0; }
 .track-label .row2 .levels{ display:inline-flex; letter-spacing:0; cursor:default; }
-.track-label .levels__detail{ display:inline-flex; gap:6px; align-items:center; }
-.track-label .level-segment{ display:inline-flex; align-items:center; flex:none; }
-/* Reserve the trend slot and reveal repeated values without changing geometry. */
-.track-label .level-segment__trend{ display:inline-block; width:1ch; text-align:center; }
+.track-label .levels__detail{ display:inline-flex; gap:8px; align-items:center; }
+.track-label .level-segment{ position:relative; display:inline-flex; align-items:center; flex:none; }
+/* Fit the trend into the normal column gap instead of adding another slot. */
+.track-label .level-segment__trend{ position:absolute; left:100%; width:8px; text-align:center; }
 .track-label .level-segment__label{ display:none; }
 .track-label .level-segment__value{ appearance:none; box-sizing:content-box; display:inline-block; width:3ch; margin:0; padding:0 1px; border:0; border-radius:3px; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; text-align:left; }
 .track-label .level-segment.is-repeated .level-segment__value{ opacity:0; }
@@ -79,6 +79,9 @@ header#topbar{ display:flex; align-items:center; gap:8px; padding:6px 8px; backg
 .track-label .row:hover .muted{ color:inherit; }
 .track-label .row:hover .levels{ color:inherit; }
 .track-label .row4 span[data-empty="true"]{ color:rgba(255,255,255,.35); }
+.track-label .row4 span[data-empty="true"],
+.track-label .row4 .assigned-ecl{ opacity:0; }
+.track-label:hover .row4 span{ opacity:1; }
 
 .track-picker{ background:#0b1117; border:1px solid var(--stroke); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; min-width:160px; max-width:220px; max-height:280px; box-shadow:0 12px 28px rgba(0,0,0,.45); color:var(--text); font-size:12px; }
 .track-picker__options{ display:flex; flex-direction:column; gap:4px; max-height:170px; overflow-y:auto; padding-right:4px; }

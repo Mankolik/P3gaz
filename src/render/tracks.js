@@ -51,7 +51,7 @@ const VERTICAL_RATE_OPTIONS = Array.from({ length: Math.floor((VERTICAL_RATE_MAX
   (_, index)=>VERTICAL_RATE_MIN + index * VERTICAL_RATE_STEP);
 const LEVEL_OPTIONS = Array.from({
   length: Math.floor((LEVEL_MAX - LEVEL_MIN) / LEVEL_STEP) + 1,
-}, (_, index)=>LEVEL_MIN + index * LEVEL_STEP);
+}, (_, index)=>LEVEL_MAX - index * LEVEL_STEP);
 
 let activeTrackPicker = null;
 
@@ -828,6 +828,7 @@ function showTrackPicker(node, anchor, className, build){
   build(panel, close);
   document.body.appendChild(panel);
   positionTrackPicker(panel, anchor);
+  scrollPickerToCurrentValue(panel);
   panel.focus?.();
   const handlePointerDown = evt=>{
     if(panel.contains(evt.target) || anchor.contains(evt.target)) return;
@@ -863,11 +864,38 @@ function positionTrackPicker(panel, anchor){
   panel.style.top = `${Math.round(top)}px`;
 }
 
-function createPickerOption(label, selected){
+function scrollPickerToCurrentValue(panel){
+  for(const list of panel.querySelectorAll('.track-picker__options')){
+    const rawCurrent = list.dataset.currentValue;
+    if(rawCurrent == null || rawCurrent === '') continue;
+    const current = Number(rawCurrent);
+    if(!Number.isFinite(current)) continue;
+    // Manual entries may fall between presets: show that range without
+    // marking a different value as the selected assignment.
+    let target = list.querySelector('.selected');
+    if(!target){
+      let nearestDistance = Infinity;
+      for(const option of list.querySelectorAll('[data-value]')){
+        const distance = Math.abs(Number(option.dataset.value) - current);
+        if(distance < nearestDistance){
+          nearestDistance = distance;
+          target = option;
+        }
+      }
+    }
+    if(!target) continue;
+    const listRect = list.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    list.scrollTop += targetRect.top - listRect.top - (list.clientHeight - targetRect.height) / 2;
+  }
+}
+
+function createPickerOption(label, selected, value){
   const option = document.createElement('button');
   option.type = 'button';
   option.className = 'track-picker__option';
   option.textContent = label;
+  if(value != null) option.dataset.value = String(value);
   if(selected) option.classList.add('selected');
   return option;
 }
@@ -937,8 +965,9 @@ function openHeadingPicker(node, anchor){
     panel.dataset.type = 'heading';
     const list = document.createElement('div');
     list.className = 'track-picker__options';
+    list.dataset.currentValue = selected ?? '';
     HEADING_OPTIONS.forEach(value=>{
-      const option = createPickerOption(formatHeading(value), selected!=null && selected === value);
+      const option = createPickerOption(formatHeading(value), selected!=null && selected === value, value);
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
@@ -1024,12 +1053,13 @@ function openSpeedPicker(node, anchor){
     const list = document.createElement('div');
     list.className = 'track-picker__options';
     const values = mode === 'Mach' ? MACH_SPEED_OPTIONS : IAS_SPEED_OPTIONS;
+    list.dataset.currentValue = selectedValue ?? '';
     values.forEach(value=>{
       const label = mode === 'Mach' ? value.toFixed(MACH_LABEL_PRECISION) : String(value);
       const selected = selectedValue!=null && (mode === 'Mach'
         ? Math.abs(value - selectedValue) < 1e-3
         : Math.abs(value - selectedValue) < 0.5);
-      const option = createPickerOption(label, selected);
+      const option = createPickerOption(label, selected, value);
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
@@ -1126,8 +1156,9 @@ function openVerticalPicker(node, anchor){
 
     const list = document.createElement('div');
     list.className = 'track-picker__options';
+    list.dataset.currentValue = selectedValue ?? '';
     VERTICAL_RATE_OPTIONS.forEach(value=>{
-      const option = createPickerOption(formatVerticalOption(value), selectedValue!=null && value === selectedValue);
+      const option = createPickerOption(formatVerticalOption(value), selectedValue!=null && value === selectedValue, value);
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
@@ -1217,6 +1248,7 @@ function createLevelEditor(field, track, node, close, options){
 
   const refresh = ()=>{
     const current = getTrackLevelValue(track, field.key);
+    list.dataset.currentValue = current ?? '';
     const buttons = list.querySelectorAll('.track-picker__option');
     buttons.forEach(btn=>{
       const value = Number.parseInt(btn.dataset.value || '', 10);
