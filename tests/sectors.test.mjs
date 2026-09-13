@@ -126,6 +126,38 @@ test('local TMAs mask overlapping UTMAs, then return to UTMA and ACC above their
   assert.equal(resolveTrackSectors(index,at(5,5,285)).sectors[0].kind,'ACC');
 });
 
+test('named UTMA A/B/C volumes retain UTMA priority and explicit display names', ()=>{
+  const upper = tma('A',fl(95),fl(285));
+  Object.assign(upper.properties,{vertical:'UTMA',name:'TEST UTMA A'});
+  const index = indexOf(sector('A'),upper,tma('B',fl(100),fl(135)));
+  assert.deepEqual(resolveTrackSectors(index,at(5,5,110)).sectors.map(s=>s.name),['TEST TMA B']);
+  const result = resolveTrackSectors(index,at(5,5,135)).sectors;
+  assert.deepEqual(result.map(s=>s.name),['TEST UTMA A']);
+  assert.equal(result[0].vertical,'UTMA');
+  assert.equal(result[0].priority,1);
+});
+
+test('rebuilt Krakow/Katowice volumes resolve lower shelves and separate upper footprints', async()=>{
+  const datasets = await Promise.all(['epww_sectors_low.geojson','epkk_epkt_tma_utma_fixed.geojson'].map(async file=>JSON.parse(await readFile(new URL(`../assets/geojson/${file}`,import.meta.url),'utf8'))));
+  assert.equal(datasets[1].features.length,8);
+  const index = createSectorIndex(datasets);
+  assert.equal(index.complete,true);
+  for(const [lon,lat,level,name] of [
+    [19.97639,50.11639,23,'EPKK LTMA'],[19.97639,50.11639,34.999,'EPKK LTMA'],
+    [19.97639,50.11639,35,'EPKK LTMA B'],[19.97639,50.11639,94.999,'EPKK LTMA B'],
+    [19.97639,50.11639,95,'EPKK UTMA A'],[19.97639,50.11639,244.999,'EPKK UTMA A'],
+    [19.97639,50.11639,245,'EPKK UTMA B'],[19.97639,50.11639,284.999,'EPKK UTMA B'],
+    [19.97639,50.11639,285,'EPWW J LOW'],
+    [19.33917,50.47556,23,'EPKT LTMA'],[19.33917,50.47556,35,'EPKK LTMA B'],
+    [19.95,50.8,200,'EPKK UTMA A'],[19.95,50.8,245,'EPWW J LOW'],
+    [21.16334,50.05125,144.999,'EPWW J LOW'],[21.16334,50.05125,145,'EPKK UTMA C'],
+    [21.16334,50.05125,245,'EPKK UTMA C'],[21.16334,50.05125,285,'EPWW J LOW'],
+  ]) assert.deepEqual(resolveTrackSectors(index,at(lon,lat,level)).sectors.map(s=>s.name),[name],`${lon},${lat} FL${level}`);
+  // Points on the eastern arcs were omitted/misordered in the former full circles.
+  assert.deepEqual(resolveTrackSectors(index,at(20.2,50.2,25)).sectors.map(s=>s.name),['EPKK LTMA']);
+  assert.deepEqual(resolveTrackSectors(index,at(19.55,50.48,25)).sectors.map(s=>s.name),['EPKT LTMA']);
+});
+
 test('separate TMA vertical bands preserve gaps and polygon holes', ()=>{
   const terminal = tma('A',fl(100),fl(130),[square(),square(3,3,7,7)]);
   terminal.properties.vertical_bands.push({floor:fl(160),ceiling:fl(180)});
@@ -147,7 +179,7 @@ test('all bundled TMAs load and override ACC at Warsaw, Gdansk and Poznan', asyn
   const datasets = await Promise.all(manifest.geojson.filter(entry=>['SECTOR_LOW','SECTOR_HIGH','TMA'].includes(entry.layer)).map(async entry=>JSON.parse(await readFile(new URL('../'+entry.path,import.meta.url),'utf8'))));
   const index = createSectorIndex(datasets);
   assert.equal(index.complete,true);
-  assert.equal(index.sectors.filter(s=>s.kind === 'TMA').length,62);
+  assert.equal(index.sectors.filter(s=>s.kind === 'TMA').length,64);
   for(const [lon,lat,level,name] of [
     [20.967,52.165,200,'EPWA TMA A'],[20.967,52.165,245,'EPWW E LOW'],
     [18.466,54.377,140,'EPGD UTMA'],[18.466,54.377,285,'EPWW F LOW'],

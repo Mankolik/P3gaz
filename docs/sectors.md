@@ -12,6 +12,8 @@ Polygon holes and MultiPolygon islands are supported. Lateral edges are included
 
 Matching local TMA volumes take precedence over broad UTMAs, and both take precedence over ACC sectors. Priority applies only after the lateral and vertical checks pass. Above/below a TMA band, outside its polygon, or inside a polygon hole, membership falls back to the next matching volume. All matches at the highest priority are retained.
 
+Named UTMA subdivisions use `vertical: "UTMA"` to preserve that priority, and an optional `name` provides the inspector's display name. See [the EPWA / EPKK rebuild notes](tma-epwa-epkk.md) for the supplied boundaries, eight-part Krakow/Katowice structure, arc interpretation and FIR approximation.
+
 TMA `vertical_bands` are checked separately, preserving gaps between bands. FL/STD limits are used directly; feet AMSL/STD are divided by 100 using the simulator's existing **standard-pressure approximation**. There is no QNH or terrain model, so unsupported references such as AGL mark the index incomplete rather than guessing. The inspector preserves source units, for example `2000 FT AMSL–FL245`, instead of relabelling AMSL limits as flight levels.
 
 `track.sectorMembership` contains `{ status, sectors }`, where status is `inside`, `outside`, or `unknown`. Each sector has `id` (for example `E:HIGH`), `code`, `vertical`, `name`, `minFl`, `maxFl`, `kind` (`ACC` or `TMA`) and `priority`. TMA matches also retain their source `floor` and `ceiling`; multi-band features get distinct band IDs. On a change, `track:sector-changed` emits `{ track, previous, current }` and the label refreshes.
