@@ -39,7 +39,7 @@ async function bootstrap(){
 
   const camera = createCamera(canvas.el);
 
-  bindInput(canvas.el, bus);
+  bindInput(canvas.el, bus, camera);
   bus.on('camera:pan', ({dx, dy})=>camera.pan(dx, dy));
   bus.on('camera:zoom', ({scale, x, y})=>camera.zoomAbout(scale, x, y));
 
