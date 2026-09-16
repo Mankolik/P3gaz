@@ -1,7 +1,6 @@
-export function bindInput(canvas, bus){
+export function bindInput(canvas, bus, camera){
   let isPanning = false;
   let last = null;
-  let zoom = 1;
   const pointers = new Map();
   let lastCenter = null;
   let lastDistance = null;
@@ -38,6 +37,8 @@ export function bindInput(canvas, bus){
 
   const emitPan = (current, previous)=>{
     if(!current || !previous) return;
+    // Use the live camera scale, including the initial fit and later view resets.
+    const zoom = camera.z;
     bus.emit('camera:pan', { dx:(current.x-previous.x)/zoom, dy:(current.y-previous.y)/zoom });
   };
 
@@ -76,7 +77,6 @@ export function bindInput(canvas, bus){
           const x = center.x - rect.left;
           const y = center.y - rect.top;
           bus.emit('camera:zoom', { scale, x, y });
-          zoom *= scale;
         }
       }
       lastDistance = distance;
@@ -97,6 +97,5 @@ export function bindInput(canvas, bus){
     e.preventDefault();
     const s = Math.exp(-e.deltaY*0.001);
     bus.emit('camera:zoom', {scale:s, x:e.offsetX, y:e.offsetY});
-    zoom *= s;
   }, {passive:false});
 }
