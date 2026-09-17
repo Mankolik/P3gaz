@@ -109,6 +109,12 @@
       "type": "point"
     },
     {
+      "id": "waypoints_abroad",
+      "path": "./assets/geojson/WptsAbroad.geojson",
+      "layer": "WAYPOINTS",
+      "type": "point"
+    },
+    {
       "id": "airports",
       "path": "./assets/geojson/airports_static.json",
       "layer": "AIRPORTS",
