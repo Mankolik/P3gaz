@@ -57,6 +57,30 @@ const LEVEL_OPTIONS = Array.from({
 }, (_, index)=>LEVEL_MAX - index * LEVEL_STEP);
 
 let activeTrackPicker = null;
+const labelNodes = new WeakMap();
+const shortcutDocuments = new WeakSet();
+
+export function getRoutePreviewTrack(){
+  return activeTrackPicker?.panel?.isConnected && activeTrackPicker.panel.dataset.type === 'direct-to'
+    ? activeTrackPicker.node.track : null;
+}
+
+function bindRouteShortcut(doc){
+  if(shortcutDocuments.has(doc)) return;
+  shortcutDocuments.add(doc);
+  doc.addEventListener('keydown',event=>{
+    if(event.key?.toLowerCase() !== 'r' || event.repeat || event.isComposing || event.defaultPrevented
+      || event.ctrlKey || event.metaKey || event.altKey) return;
+    const editing=element=>element?.isContentEditable || element?.closest?.('input,textarea,select,[role="textbox"]');
+    if(editing(event.target) || editing(doc.activeElement)) return;
+    // Actual pointer hover, not the last selected/focused label. Removed labels
+    // and pointer movement outside a label cannot leave a stale shortcut target.
+    const node=labelNodes.get(doc.querySelector('.track-label:hover'));
+    if(!node?.track) return;
+    event.preventDefault();
+    node.track.routeVisible=!node.track.routeVisible;
+  });
+}
 
 function degToRad(heading){
   const deg = Number.isFinite(heading) ? heading : 0;
@@ -390,6 +414,7 @@ function formatExpectedLevel(level){
 }
 
 function ensureOverlayCache(overlay){
+  bindRouteShortcut(overlay.ownerDocument);
   if(!overlay.__trackNodes){
     overlay.__trackNodes = new Map();
   }
@@ -408,6 +433,7 @@ function getTrackRevision(track){
 function createLabelNode(){
   const root = document.createElement('div');
   root.className = 'track-label';
+  root.title = 'R: toggle route display';
 
   const row0 = createRow('row0');
   const row1 = createRow('row1');
@@ -511,6 +537,7 @@ function createLabelNode(){
     lastVerticalSpeed: null,
     lastMetricsUpdate: 0,
   };
+  labelNodes.set(root,node);
 
   speedToggle.addEventListener('click', evt=>{
     evt.preventDefault();

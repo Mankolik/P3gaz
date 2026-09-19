@@ -18,3 +18,4 @@ Open `index.html` in a modern browser.
 
 - [Airway routes and PANSA data](pansa-airways.md)
 - [Aircraft spawner, levels and route coverage](aircraft-spawner.md)
+- [Viewing routes and the R shortcut](route-display.md)
