@@ -3,6 +3,7 @@ import { registerLayer, addFeatures } from '../render/layers.js';
 import { normalizeGeoJSON } from '../data/importers/geojson.js';
 import { loadJSON } from '../data/loader.js';
 import { initDefaultLayers } from '../map/layers.js';
+import { mountSpawnButton } from './spawn-button.js';
 
 export function mountTopbar(root, state, bus){
   root.innerHTML = '';
@@ -77,6 +78,7 @@ export function mountTopbar(root, state, bus){
 
   // MENU toggle
   const gMenu=wrap('MENU'); gMenu.append(toggleText(state.ui.top.menuOn, on=>{ state.ui.top.menuOn=on; document.getElementById('bottombar').classList.toggle('hidden', !on); })); root.append(gMenu);
+  mountSpawnButton(root,state,bus);
 
   // helpers
   function elOption(label, fn){ const o=el('div','option',label); o.onclick=fn; return o; }

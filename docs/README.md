@@ -17,3 +17,4 @@ Open `index.html` in a modern browser.
 ## Navigation
 
 - [Airway routes and PANSA data](pansa-airways.md)
+- [Aircraft spawner, levels and route coverage](aircraft-spawner.md)

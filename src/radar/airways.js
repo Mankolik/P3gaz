@@ -101,7 +101,12 @@ export function createAirwayResolver(dataset, navigationIndex = new Map()) {
     return result;
   }
 
-  return { resolveRoute, expandAirway };
+  return { resolveRoute, expandAirway, resolvePoint,
+    getAirway(name) {
+      const airway=airways.get(pointName(name));
+      return airway ? {waypoints:[...airway.waypoints],legs:airway.legs.map(leg=>({...leg,directions:[...leg.directions]}))} : null;
+    }
+  };
 }
 
 // Resolve completely before touching the aircraft, so invalid routes are atomic.

@@ -5,7 +5,7 @@ import { createBus } from './core/bus.js';
 import { createState, loadConfig, saveConfig } from './core/state.js';
 import { bindInput } from './core/input.js';
 import { createTick } from './core/tick.js';
-import { loadJSON, loadAirways } from './data/loader.js';
+import { loadJSON, loadAirways, loadAircraftSpawner } from './data/loader.js';
 import { normalizeGeoJSON } from './data/importers/geojson.js';
 import { initDefaultLayers } from './map/layers.js';
 import { registerLayer, addFeatures } from './render/layers.js';
@@ -116,9 +116,25 @@ async function loadDatasets(state, camera, canvasEl){
     state.air.tracks = createDemoTracks(project, state.air.airwayResolver);
     updateTrackSectors(state);
 
+    try {
+      const missingNavigation=entries.filter(e=>['FIR','WAYPOINTS','AIRPORTS'].includes(e.layer)).filter(e=>!loaded.some(d=>d.entry===e));
+      if(missingNavigation.length)throw new Error('Required map/navigation files did not load.');
+      const firData=loaded.find(({entry})=>entry.layer==='FIR')?.data;
+      state.air.spawner=await loadAircraftSpawner(state.air.airwayResolver,firData);
+      const catalogue=state.air.spawner.catalogue;
+      if(catalogue.diagnostics.length)console.info('Traffic route catalogue diagnostics',catalogue.diagnostics);
+      console.info(`Traffic catalogue: ${catalogue.validVariants}/${catalogue.totalVariants} routes, ${catalogue.groups.length}/${catalogue.totalGroups} airport pairs.`);
+    } catch(error) {
+      state.air.spawnError=error.message;
+      console.error('Failed to prepare aircraft spawner',error);
+    }
+    state.bus.emit('spawner:ready');
+
     fitAll(state, camera, canvasEl);
     if(epwwBounds) fitBounds(camera, canvasEl, epwwBounds, 80);
   } catch(err){
+    state.air.spawnError=err.message;
+    state.bus.emit('spawner:ready');
     console.error('Failed to load manifest', err);
   }
 }
