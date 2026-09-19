@@ -13,3 +13,7 @@ Open `index.html` in a modern browser.
 - Wire MAP toggles to `state.map.layers.get(name).visible`
 - Implement GeoJSON loader and `fitAll()` call after import
 - Add traffic model and apply FALT/QL/Filter OFF
+
+## Navigation
+
+- [Airway routes and PANSA data](pansa-airways.md)

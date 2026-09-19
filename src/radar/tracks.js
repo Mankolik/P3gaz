@@ -14,7 +14,7 @@ function normalizeHeading(heading){
   return ((heading % 360) + 360) % 360;
 }
 
-function baseTrack(data, project, index){
+export function createTrack(data, project, index=0, airwayResolver=null){
   const id = data.id || `track-${index+1}`;
   const heading = normalizeHeading(data.heading);
   const vectorScale = data.vectorScale || 8;
@@ -65,11 +65,19 @@ function baseTrack(data, project, index){
     base.x = data.x ?? 0;
     base.y = data.y ?? 0;
   }
-  if(data.flightPlan) setFlightPlan(base, data.flightPlan.waypoints, data.flightPlan.nextIndex ?? 0);
+  if(data.flightPlan){
+    const plan = typeof data.flightPlan === 'string' ? {route:data.flightPlan} : data.flightPlan;
+    let waypoints = plan.waypoints;
+    if(plan.route !== undefined){
+      if(!airwayResolver) throw new Error('Airway navigation data is not loaded.');
+      waypoints = airwayResolver.resolveRoute(plan.route);
+    }
+    setFlightPlan(base, waypoints, plan.nextIndex ?? 0);
+  }
   return base;
 }
 
-export function createDemoTracks(project){
+export function createDemoTracks(project, airwayResolver=null){
   const tracks = [
     {
       id: 'WZZ1891',
@@ -195,5 +203,5 @@ export function createDemoTracks(project){
     },
   ];
 
-  return tracks.map((data, index)=>baseTrack(data, project, index));
+  return tracks.map((data, index)=>createTrack(data, project, index, airwayResolver));
 }

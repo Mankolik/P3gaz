@@ -5,7 +5,7 @@ import { createBus } from './core/bus.js';
 import { createState, loadConfig, saveConfig } from './core/state.js';
 import { bindInput } from './core/input.js';
 import { createTick } from './core/tick.js';
-import { loadJSON } from './data/loader.js';
+import { loadJSON, loadAirways } from './data/loader.js';
 import { normalizeGeoJSON } from './data/importers/geojson.js';
 import { initDefaultLayers } from './map/layers.js';
 import { registerLayer, addFeatures } from './render/layers.js';
@@ -83,6 +83,11 @@ async function loadDatasets(state, camera, canvasEl){
     });
     state.map.project = project;
     state.air.navigationIndex = createNavigationIndex(loaded.filter(({entry})=>['WAYPOINTS','AIRPORTS'].includes(entry.layer)).map(({data})=>data));
+    try {
+      state.air.airwayResolver = await loadAirways(state.air.navigationIndex);
+    } catch(err){
+      console.error('Failed to load airway navigation data', err);
+    }
     let epwwBounds = null;
     for(const {entry, data} of loaded){
       const features = normalizeGeoJSON(data, project);
@@ -108,7 +113,7 @@ async function loadDatasets(state, camera, canvasEl){
         if(bounds) epwwBounds = mergeBounds(epwwBounds, bounds);
       }
     }
-    state.air.tracks = createDemoTracks(project);
+    state.air.tracks = createDemoTracks(project, state.air.airwayResolver);
     updateTrackSectors(state);
 
     fitAll(state, camera, canvasEl);
