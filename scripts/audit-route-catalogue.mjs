@@ -6,7 +6,7 @@ import {parseRouteCatalogue,compileRouteCatalogue} from '../src/radar/route-cata
 
 const read=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const json=path=>JSON.parse(read(path));
-const nav=createNavigationIndex(['pl_enr4_4_waypoints.geojson','WptsAbroad.geojson','airports_static.json'].map(p=>json('assets/geojson/'+p)));
+const nav=createNavigationIndex(['pl_enr4_4_waypoints.geojson','WptsAbroad.geojson','airports_static.json','route-point-corrections.geojson'].map(p=>json('assets/geojson/'+p)));
 const resolver=createAirwayResolver(json('assets/navigation/pansa-airways.json'),nav);
 const boundary=createFirBoundary(json('assets/geojson/flightmap_europe_fir_uir.json'));
 const catalogue=compileRouteCatalogue(parseRouteCatalogue(read('assets/sources/Airporty_revamped.txt')),resolver,boundary);

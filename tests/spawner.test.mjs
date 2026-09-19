@@ -13,7 +13,7 @@ import {loadAircraftSpawner} from '../src/data/loader.js';
 
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const json=p=>JSON.parse(read(p));
-const geoNames=['pl_enr4_4_waypoints.geojson','WptsAbroad.geojson','airports_static.json'];
+const geoNames=['pl_enr4_4_waypoints.geojson','WptsAbroad.geojson','airports_static.json','route-point-corrections.geojson'];
 const nav=createNavigationIndex(geoNames.map(p=>json('assets/geojson/'+p)));
 const resolver=createAirwayResolver(json('assets/navigation/pansa-airways.json'),nav);
 const firData=json('assets/geojson/flightmap_europe_fir_uir.json');
@@ -42,6 +42,52 @@ test('route tokens accept level-only and speed/level annotations, adjacent fixes
   assert.equal(r.annotations.length,2);
   assert.throws(()=>tokenizeRoute('EPWA DCT','EPWA','EPGD'),/Missing/);
   assert.throws(()=>tokenizeRoute('EPWA DCT A/BAD STAR EPGD','EPWA','EPGD'),/annotation/);
+});
+
+test('supplied point corrections restore routes without bypassing missing points or entry rules',()=>{
+  assert.equal(catalogue.validVariants,251);
+  assert.equal(catalogue.groups.length,184);
+  assert.deepEqual(catalogue.diagnostics.filter(d=>d.severity==='error'),[]);
+  const elvot=resolver.resolvePoint('ELVOT');
+  assert(Math.abs(elvot.lat-50.611666666666665)<1e-10);
+  assert(Math.abs(elvot.lon-16.409166666666664)<1e-10);
+  const restored=only('EPBY','EPWA').groups[0].variants[0];
+  assert.equal(restored.waypoints[0].name,'EPBY');
+  assert(restored.waypoints.some(p=>p.name==='ANHUR'));
+  for(const [departure,destination,entry,exit] of [['EPKT','EGSS','SUBIX','SONUD'],['EPLL','EGSS','SUBIX','SONUD'],['EGSS','EPPO','SONUD','SUBIX']]){
+    const v=only(departure,destination).groups[0].variants.find(v=>v.route.includes('IDOBA'));
+    const names=v.waypoints.map(p=>p.name),i=names.indexOf('IDOBA');
+    assert.deepEqual(names.slice(i-1,i+2),[entry,'IDOBA',exit]);
+  }
+  const corrected=only('LATI','ESSA').groups[0].variants[0].waypoints.map(p=>p.name);
+  assert.equal(corrected.filter(n=>n==='KEROP').length,1);assert(!corrected.includes('BUG'));
+  for(const [departure,destination] of [['EDDF','EETN'],['EDDF','EVRA'],['EDDF','EYVI'],['LFPG','EYVI']]){
+    const v=only(departure,destination).groups[0].variants[0];
+    assert(!v.route.split(/\s+/).includes('N858'));
+    assert(v.waypoints.some(p=>p.name==='BOKSU'));
+  }
+  const unmodified=groups.find(g=>g.departure==='EGBB'&&g.destination==='EPBY');
+  assert(unmodified.variants[0].route.includes('DENKO N858 DEKUT'));
+  const magVariant=only('EGSS','EPLL').groups[0].variants[0];
+  const magTokens=tokenizeRoute(magVariant.route,'EGSS','EPLL').fixes;
+  const magIndex=magTokens.indexOf('MAG');
+  const magSequence=['MAG','KISUC','BUROK','ESIKA','LULUL','SONUD','IDOBA','SUBIX'];
+  assert.deepEqual(magTokens.slice(magIndex,magIndex+8),magSequence);
+  const magRoute=magVariant.waypoints.map(p=>p.name);
+  assert.deepEqual(magRoute.slice(magRoute.indexOf('MAG'),magRoute.indexOf('MAG')+8),magSequence);
+  assert.deepEqual(magVariant.omittedPoints,[]);
+  const okl=resolver.resolvePoint('OKL'),pam=resolver.resolvePoint('PAM');
+  assert(Math.abs(okl.lat-50.09583055555556)<1e-10);
+  assert(Math.abs(okl.lon-14.265555555555556)<1e-10);
+  assert(Math.abs(pam.lat-52.33471944444444)<1e-10);
+  assert(Math.abs(pam.lon-5.092222222222222)<1e-10);
+  for(const destination of ['EETN','EYVI']){
+    const g=only('LKPR',destination).groups[0];
+    const t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(state());
+    assert.equal(t.onGround,true);assert.equal(t.spawnPoint,'LKPR');
+    assert.equal(navigationTarget(t).name,'OKL');
+  }
+  assert(only('EGSS','EPBY').groups[0].variants[0].waypoints.some(p=>p.name==='PAM'));
 });
 
 test('boundary entry uses segments and selects two points before entry or a boundary fix',()=>{
@@ -96,7 +142,7 @@ test('missing local fixes are rejected, foreign prefix omissions never bridge th
   const result=compileRouteCatalogue(bad,resolver,fir);
   assert.equal(result.groups.length,0);assert.equal(result.diagnostics[0].severity,'error');
   assert(catalogue.diagnostics.some(d=>d.severity==='notice'));
-  assert(catalogue.diagnostics.some(d=>d.severity==='error'));
+  assert(!catalogue.diagnostics.some(d=>d.severity==='error'));
 });
 
 test('cross-border airways use a unique published boundary endpoint; unknown local airways fail',()=>{

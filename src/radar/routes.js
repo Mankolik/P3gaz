@@ -9,17 +9,21 @@ const changed = track=>{ track.labelRevision = (track.labelRevision || 0) + 1; }
 
 export function createNavigationIndex(collections){
   const index = new Map();
+  const overrides = new Map();
   for(const collection of collections || []){
     for(const feature of collection?.features || []){
       if(feature.geometry?.type !== 'Point') continue;
       const [lon,lat] = feature.geometry.coordinates || [];
       const point = {name:pointName(feature.properties?.icao || feature.properties?.name),lon,lat};
       if(!validPoint(point)) continue;
-      const matches = index.get(point.name) || [];
+      // Explicit simulator corrections take precedence regardless of load order.
+      const target = collection.navigationOverrides === true ? overrides : index;
+      const matches = target.get(point.name) || [];
       if(!matches.some(p=>p.lon === lon && p.lat === lat)) matches.push(point);
-      index.set(point.name,matches);
+      target.set(point.name,matches);
     }
   }
+  for(const [name,matches] of overrides) index.set(name,matches);
   return index;
 }
 

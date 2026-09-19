@@ -25,6 +25,20 @@ test('navigation catalog uses real geographic points and retains ambiguous names
   assert.equal(duplicate.has('BAD'),false);
 });
 
+test('explicit navigation corrections override duplicates independently of dataset order',()=>{
+  const feature=(name,coordinates)=>({properties:{name},geometry:{type:'Point',coordinates}});
+  const imported={features:[feature('ELVOT',[1,2]),feature('ELVOT',[3,4]),feature('OTHER',[5,6]),feature('OTHER',[7,8])]};
+  const corrections={navigationOverrides:true,features:[feature('ELVOT',[16.409166666666664,50.611666666666665]),feature('SUXTU',[17.28111111111111,53.06])]};
+  for(const collections of [[imported,corrections],[corrections,imported]]){
+    const index=createNavigationIndex(collections);
+    assert.deepEqual(index.get('ELVOT'),[{name:'ELVOT',lon:16.409166666666664,lat:50.611666666666665}]);
+    assert.equal(index.get('SUXTU').length,1);
+    assert.equal(index.get('OTHER').length,2,'unrelated ambiguities remain visible');
+  }
+  const conflict={navigationOverrides:true,features:[feature('ELVOT',[10,20])]};
+  assert.equal(createNavigationIndex([imported,corrections,conflict]).get('ELVOT').length,2,'conflicting corrections must not silently win');
+});
+
 test('direct-to captures the point and holds arrival heading without resurrecting a clearance',()=>{
   const track=aircraft();
   assignDirectTo(track,point('END',0.1));

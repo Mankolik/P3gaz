@@ -119,6 +119,12 @@
       "path": "./assets/geojson/airports_static.json",
       "layer": "AIRPORTS",
       "type": "point"
+    },
+    {
+      "id": "route_point_corrections",
+      "path": "./assets/geojson/route-point-corrections.geojson",
+      "layer": "WAYPOINTS",
+      "type": "point"
     }
   ],
   "plugins": []

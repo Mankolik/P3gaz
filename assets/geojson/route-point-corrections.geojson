@@ -1,0 +1,248 @@
+{
+  "type": "FeatureCollection",
+  "navigationOverrides": true,
+  "source": "User-supplied simulator corrections, 2026-09-19. Original imported datasets are retained.",
+  "note": "SUXTU uses the supplied full DMS coordinate; the alternative compact format differs.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "SUXTU",
+        "sourceLatitude": "53 3 36 N",
+        "sourceLongitude": "17 16 52 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.28111111111111,
+          53.059999999999995
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ELVOT",
+        "sourceLatitude": "50 36 42 N",
+        "sourceLongitude": "16 24 33 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.409166666666664,
+          50.611666666666665
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "KEVQI",
+        "sourceLatitude": "53 9 21 N",
+        "sourceLongitude": "17 16 9 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.269166666666667,
+          53.155833333333334
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ANHUR",
+        "sourceLatitude": "53 8 33 N",
+        "sourceLongitude": "18 42 13 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.703611111111112,
+          53.1425
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ABNED",
+        "sourceLatitude": "52 4 1 N",
+        "sourceLongitude": "3 23 33 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3925,
+          52.066944444444445
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "HLZ",
+        "sourceLatitude": "52 21 48.22 N",
+        "sourceLongitude": "10 47 42.79 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.795219444444445,
+          52.363394444444445
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "MAG",
+        "sourceLatitude": "51 59 41.99 N",
+        "sourceLongitude": "11 47 39.99 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.794441666666666,
+          51.994997222222224
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "WSN",
+        "sourceLatitude": "53 20 49.81 N",
+        "sourceLongitude": "8 52 29.04 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.874733333333333,
+          53.34716944444445
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "SAS",
+        "sourceLatitude": "52 15 2.8 N",
+        "sourceLongitude": "9 53 3.19 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.884219444444444,
+          52.25077777777778
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "CLN",
+        "sourceLatitude": "51 50 55 N",
+        "sourceLongitude": "1 8 50.99 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1.1474972222222222,
+          51.84861111111111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "TACHA",
+        "sourceLatitude": "52 6 18 N",
+        "sourceLongitude": "7 1 6 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0183333333333335,
+          52.105000000000004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ODCIH",
+        "sourceLatitude": "46 51 58 N",
+        "sourceLongitude": "21 36 6 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.601666666666667,
+          46.86611111111111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "JAN",
+        "sourceLatitude": "48 10 42.99 N",
+        "sourceLongitude": "17 32 41 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.544722222222223,
+          48.17860833333333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "VLM",
+        "sourceLatitude": "49 42 14.99 N",
+        "sourceLongitude": "15 3 59.99 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.06666388888889,
+          49.70416388888889
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "OKL",
+        "sourceLatitude": "50 5 44.99 N",
+        "sourceLongitude": "14 15 56 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.265555555555556,
+          50.09583055555556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "PAM",
+        "sourceLatitude": "52 20 4.99 N",
+        "sourceLongitude": "5 5 32 E"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          5.0922222222222215,
+          52.334719444444445
+        ]
+      }
+    }
+  ]
+}
