@@ -39,7 +39,7 @@ bus.emit('spawner:ready');
     await page.goto(origin+'/fixture');
     const button=page.getByRole('button',{name:'Spawn aircraft'});
     await page.waitForFunction(()=>window.spawnTest?.state.air.spawner);
-    assert.equal(await page.evaluate(()=>window.spawnTest.state.air.spawner.catalogue.validVariants),247);
+    assert.equal(await page.evaluate(()=>window.spawnTest.state.air.spawner.catalogue.validVariants),251);
     const elvot=await page.evaluate(()=>window.spawnTest.state.air.navigationIndex.get('ELVOT'));
     assert.equal(elvot.length,1);assert(Math.abs(elvot[0].lat-50.611666666666665)<1e-10);
     assert.equal(await button.isEnabled(),true);
