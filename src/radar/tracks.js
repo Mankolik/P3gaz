@@ -42,6 +42,8 @@ export function createTrack(data, project, index=0, airwayResolver=null){
     squawk: data.squawk,
     wake: data.wake,
     destination: data.destination,
+    departure: data.departure,
+    onGround: !!data.onGround,
     exitPoint: data.exitPoint,
     flightPlan: null,
     directTo: null,

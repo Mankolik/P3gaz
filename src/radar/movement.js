@@ -81,6 +81,15 @@ function advanceTrack(track, dtSeconds, project){
     track.vectorDy = 0;
     return;
   }
+  if(track.onGround){
+    // A generic departure, not runway/SID simulation: require both clearances.
+    if(!(track.assignedSpeed?.value > 0 && track.clearedFlightLevel > track.actualFlightLevel)){
+      track.groundSpeed=0;track.verticalSpeed=0;track.vectorDx=0;track.vectorDy=0;
+      return;
+    }
+    track.onGround=false;
+    track.labelRevision=(track.labelRevision||0)+1;
+  }
   const heading = normalizeHeading(track.heading);
   let targetPoint = navigationTarget(track);
   if(targetPoint && track.groundSpeed > 0 && passedNavigationPoint(track,track,targetPoint)){
@@ -331,4 +340,3 @@ function approachValue(current, target, maxDelta){
   }
   return current + Math.sign(diff) * maxDelta;
 }
-
