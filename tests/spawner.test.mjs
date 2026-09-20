@@ -11,6 +11,8 @@ import {createBus} from '../src/core/bus.js';
 import {updateTrackMovement} from '../src/radar/movement.js';
 import {loadAircraftSpawner} from '../src/data/loader.js';
 import {parseRouteAircraft,applyRouteAircraft} from '../src/radar/route-aircraft.js';
+import {aircraftPerformance} from '../src/radar/performance.js';
+import {convertIasToTas,convertMachToTas} from '../src/utils/speed.js';
 
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const json=p=>JSON.parse(read(p));
@@ -122,7 +124,8 @@ test('real KJFK arrival starts at BIVKI, with SONAL and BINKA ahead and expanded
   assert.equal(t.status,'accepted');assert.equal(t.onGround,false);
   assert.equal(t.spawnPoint,'BIVKI');assert.equal(navigationTarget(t).name,'SONAL');
   assert(FLIGHT_LEVELS.east.includes(t.actualFlightLevel));
-  assert.equal(t.actualFlightLevel,t.clearedFlightLevel);assert.equal(t.groundSpeed,450);
+  assert.equal(t.actualFlightLevel,t.clearedFlightLevel);
+  assert.equal(t.groundSpeed,convertMachToTas(aircraftPerformance(t.aircraftType).cruise.mach,t.actualFlightLevel*100));
   const before={lon:t.lon,lat:t.lat};updateTrackMovement(s,10);
   assert.notDeepEqual({lon:t.lon,lat:t.lat},before);assert.equal(t.actualFlightLevel,t.clearedFlightLevel);
 });
@@ -184,15 +187,17 @@ test('every eligible airborne variant spawns outside with two prior points and a
   }
 });
 
-test('airport departures start airborne at FL010 and 180 knots and immediately follow the route',()=>{
+test('airport departures start at FL010 / IAS180 and adopt type speed while holding their clearance',()=>{
   for(const departure of ['EPWA','EPKK','EYVI','LKPR','EDDB']){
     const g=catalogue.groups.find(g=>g.departure===departure);
     assert(g,departure);
     const s=state(),t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(s);
     assert.equal(t.onGround,false);assert.equal(t.spawnPoint,departure);
-    assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);assert.equal(t.groundSpeed,180);
+    assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);assert.equal(t.groundSpeed,convertIasToTas(180,1000));
+    assert.equal(t.assignedSpeed.value,null);
     const location=[t.lon,t.lat];updateTrackMovement(s,60);
-    assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,10);assert.equal(t.groundSpeed,180);
+    assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,10);
+    assert.equal(t.groundSpeed,convertIasToTas(aircraftPerformance(t.aircraftType).initialClimb.speed.value,1000));
     t.clearedFlightLevel=100;updateTrackMovement(s,10);
     assert(t.actualFlightLevel>10);
   }

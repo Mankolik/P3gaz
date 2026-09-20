@@ -11,8 +11,9 @@ import {createState} from '/src/core/state.js';import {createBus} from '/src/cor
 import {mountTopbar} from '/src/ui/topbar.js';import {createNavigationIndex} from '/src/radar/routes.js';
 import {loadJSON,loadAirways,loadAircraftSpawner} from '/src/data/loader.js';
 import {createAircraftSpawner} from '/src/radar/spawner.js';import {updateTrackMovement} from '/src/radar/movement.js';
+import {convertIasToTas,convertMachToTas} from '/src/utils/speed.js';
 const bus=createBus(),state=createState(bus);state.map.project=(lon,lat)=>[lon*1000,-lat*1000];
-mountTopbar(document.querySelector('#topbar'),state,bus);window.spawnTest={state,bus,updateTrackMovement};
+mountTopbar(document.querySelector('#topbar'),state,bus);window.spawnTest={state,bus,updateTrackMovement,convertIasToTas,convertMachToTas};
 const nav=await Promise.all(['pl_enr4_4_waypoints.geojson','WptsAbroad.geojson','airports_static.json','route-point-corrections.geojson'].map(p=>loadJSON('/assets/geojson/'+p)));
 state.air.navigationIndex=createNavigationIndex(nav);const resolver=await loadAirways(state.air.navigationIndex);
 const loaded=await loadAircraftSpawner(resolver,await loadJSON('/assets/geojson/flightmap_europe_fir_uir.json'));
@@ -46,19 +47,22 @@ bus.emit('spawner:ready');
     await button.click();
     let track=await page.evaluate(()=>window.spawnTest.state.air.tracks.at(-1));
     assert.equal(track.status,'accepted');assert.equal(track.departure,'EPWA');assert.equal(track.onGround,false);
-    assert.equal(track.actualFlightLevel,10);assert.equal(track.groundSpeed,180);
+    assert.equal(track.actualFlightLevel,10);assert(Math.abs(track.groundSpeed-182.66371101904573)<1e-8);
+    assert.equal(track.assignedSpeed.value,null);
     assert.equal(track.aircraftType,'E170');assert.equal(track.sourceRoute.operator,'LOT');
     assert.match(await page.getByRole('status').innerText(),/EPWA/);
     await page.evaluate(()=>{
       const {state}=window.spawnTest;const t=state.air.tracks.at(-1);const lon=t.lon,lat=t.lat;window.spawnTest.updateTrackMovement(state,30);
-      if(t.groundSpeed!==180||t.actualFlightLevel!==10||(t.lon===lon&&t.lat===lat))throw Error('Departure did not move');
-      t.assignedSpeed={mode:'IAS',value:180};t.clearedFlightLevel=100;window.spawnTest.updateTrackMovement(state,10);
-      if(t.onGround||t.groundSpeed<=0||t.actualFlightLevel<=0)throw Error('Departure did not release');
+      if(Math.abs(t.groundSpeed-window.spawnTest.convertIasToTas(190,1000))>1e-8||t.actualFlightLevel!==10||(t.lon===lon&&t.lat===lat))throw Error('Departure did not adopt E170 speed');
+      t.clearedFlightLevel=100;window.spawnTest.updateTrackMovement(state,10);
+      if(t.onGround||t.verticalSpeed!==3400||t.actualFlightLevel<=10)throw Error('Departure did not use E170 climb rate');
       const groups=state.air.spawner.catalogue.groups;window.spawnDraws=[(groups.findIndex(g=>g.departure==='KJFK'&&g.destination==='EPWA')+0.1)/groups.length,0,0,0.75,0.5];
     });
     await button.click();track=await page.evaluate(()=>window.spawnTest.state.air.tracks.at(-1));
     assert.equal(track.spawnPoint,'BIVKI');assert.equal(track.status,'accepted');assert.equal(track.onGround,false);
     assert.equal(track.aircraftType,'B789');assert.equal(track.wake,'H');
+    assert(track.actualFlightLevel<=430);
+    assert.equal(track.groundSpeed,await page.evaluate(t=>window.spawnTest.convertMachToTas(0.85,t.actualFlightLevel*100),track));
     assert.equal(track.flightPlan.waypoints[track.flightPlan.nextIndex].name,'SONAL');
     assert.match(await page.getByRole('status').innerText(),/BIVKI/);
     // The small control stays at the upper-right at common and narrow widths.

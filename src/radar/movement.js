@@ -1,5 +1,6 @@
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
 import { navigationTarget, navigationHeading, passedNavigationPoint, completeNavigationPoint } from './routes.js';
+import { aircraftPerformance, aircraftCeiling, performanceSchedule } from './performance.js';
 
 const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
 const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
@@ -12,7 +13,6 @@ const MAX_VERTICAL_RATE_FPM = 4000;
 const DEFAULT_VERTICAL_RATE_FPM = 1500;
 const VERTICAL_RATE_CHANGE_PER_SECOND = 1500;
 const MIN_FLIGHT_LEVEL = 0;
-const MAX_FLIGHT_LEVEL = 600;
 
 function toRadians(deg){
   return (Number.isFinite(deg) ? deg : 0) * Math.PI / 180;
@@ -62,10 +62,10 @@ export function updateTrackMovement(state, dt){
   }
 
   for(const track of tracks){
-    // Small navigation steps preserve turn rate and fix capture at accelerated time.
+    // Small steps preserve navigation and performance phase crossings at accelerated time.
     let remaining = seconds;
     while(remaining > 0){
-      const step = navigationTarget(track) ? Math.min(remaining,0.5) : remaining;
+      const step = navigationTarget(track) || aircraftPerformance(track.aircraftType) ? Math.min(remaining,0.5) : remaining;
       advanceTrack(track, step, project);
       remaining -= step;
     }
@@ -99,7 +99,9 @@ function advanceTrack(track, dtSeconds, project){
   const nextHeading = updateHeading(track, heading, dtSeconds, targetPoint ? navigationHeading(track,targetPoint) : null);
   track.heading = nextHeading;
 
-  const speed = updateGroundSpeed(track, dtSeconds, nextHeading);
+  const performance=performanceSchedule(track);
+  if(performance)track.performancePhase=performance.phase;
+  const speed = updateGroundSpeed(track, dtSeconds, nextHeading, performance);
   const lon = track.lon;
   const lat = track.lat;
 
@@ -123,7 +125,7 @@ function advanceTrack(track, dtSeconds, project){
   track.x = projected.x;
   track.y = projected.y;
 
-  updateVerticalState(track, dtSeconds);
+  updateVerticalState(track, dtSeconds, performance);
 
   updateTrackVector(track, project);
 }
@@ -180,9 +182,11 @@ function shortestHeadingDelta(current, target){
   return delta;
 }
 
-function updateGroundSpeed(track, dtSeconds, heading){
+function updateGroundSpeed(track, dtSeconds, heading, performance){
   const currentSpeed = Number.isFinite(track?.groundSpeed) ? Math.max(track.groundSpeed, 0) : 0;
-  const assigned = track?.assignedSpeed;
+  // Automatic speeds are targets, never ATC assignments. Clearing a manual
+  // IAS/Mach instruction immediately resumes the current type/phase schedule.
+  const assigned = Number.isFinite(track?.assignedSpeed?.value) ? track.assignedSpeed : performance?.speed;
   const target = calculateTargetGroundSpeed(track, assigned, heading);
   if(target==null || !Number.isFinite(target)){
     return currentSpeed;
@@ -257,22 +261,24 @@ function determineTargetFlightLevel(track){
   return null;
 }
 
-function updateVerticalState(track, dtSeconds){
+function updateVerticalState(track, dtSeconds, performance){
   if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
     return;
   }
 
+  const ceiling=aircraftCeiling(track);
   let currentLevel = Number(track.actualFlightLevel);
   if(!Number.isFinite(currentLevel)){
     const fallback = determineTargetFlightLevel(track);
     if(fallback!=null){
-      track.actualFlightLevel = clamp(fallback, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+      track.actualFlightLevel = clamp(fallback, MIN_FLIGHT_LEVEL, ceiling);
     }
     track.verticalSpeed = 0;
     return;
   }
 
-  const targetLevel = determineTargetFlightLevel(track);
+  const requestedLevel = determineTargetFlightLevel(track);
+  const targetLevel = requestedLevel==null?null:clamp(requestedLevel,MIN_FLIGHT_LEVEL,ceiling);
   if(targetLevel==null){
     const currentRate = Number(track.verticalSpeed) || 0;
     const rateDelta = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
@@ -282,7 +288,7 @@ function updateVerticalState(track, dtSeconds){
 
   const diff = targetLevel - currentLevel;
   if(Math.abs(diff) <= FLIGHT_LEVEL_TOLERANCE){
-    track.actualFlightLevel = clamp(targetLevel, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+    track.actualFlightLevel = clamp(targetLevel, MIN_FLIGHT_LEVEL, ceiling);
     track.verticalSpeed = 0;
     return;
   }
@@ -295,20 +301,25 @@ function updateVerticalState(track, dtSeconds){
     if(magnitude === 0){
       desiredRate = 0;
     }else if(assignment.comparator === 'or-greater'){
-      desiredRate = direction * Math.max(magnitude, Math.abs(Number(track.verticalSpeed) || 0));
+      desiredRate = direction * Math.max(magnitude, performance?.rateFpm ?? Math.abs(Number(track.verticalSpeed) || 0));
     }else if(assignment.comparator === 'or-less'){
-      desiredRate = direction * Math.min(magnitude, Math.abs(Number(track.verticalSpeed) || magnitude));
+      desiredRate = direction * Math.min(magnitude, performance?.rateFpm ?? Math.abs(Number(track.verticalSpeed) || magnitude));
     }else{
       desiredRate = direction * magnitude;
     }
   }else{
-    desiredRate = direction * computeDefaultVerticalRate(Math.abs(diff));
+    desiredRate = direction * (performance?.rateFpm ?? computeDefaultVerticalRate(Math.abs(diff)));
   }
+
+  // Phase rates also bound controller requests; an assignment cannot create
+  // climb/descent performance above the supplied type's current capability.
+  const rateLimit=performance?.rateFpm ?? MAX_VERTICAL_RATE_FPM;
+  desiredRate=clamp(desiredRate,-rateLimit,rateLimit);
 
   const currentRate = Number(track.verticalSpeed) || 0;
   const maxChange = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
   const nextRate = approachValue(currentRate, desiredRate, maxChange);
-  const clampedRate = clamp(nextRate, -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM);
+  const clampedRate = clamp(nextRate, -rateLimit, rateLimit);
   track.verticalSpeed = Math.abs(clampedRate) < 1 ? 0 : clampedRate;
 
   const deltaFlightLevel = (track.verticalSpeed * dtSeconds) / (SECONDS_PER_MINUTE * FEET_PER_FLIGHT_LEVEL);
@@ -317,7 +328,7 @@ function updateVerticalState(track, dtSeconds){
     nextLevel = targetLevel;
     track.verticalSpeed = 0;
   }
-  track.actualFlightLevel = clamp(nextLevel, MIN_FLIGHT_LEVEL, MAX_FLIGHT_LEVEL);
+  track.actualFlightLevel = clamp(nextLevel, MIN_FLIGHT_LEVEL, ceiling);
 }
 
 function computeDefaultVerticalRate(diffFlightLevel){

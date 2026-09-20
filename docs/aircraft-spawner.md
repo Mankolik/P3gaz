@@ -8,12 +8,12 @@ Routes and callsigns come from `assets/sources/Airporty_revamped.txt`. Choose an
 
 `assets/sources/route-aircraft-types.txt` contains the user's aircraft list for all 184 directional pairs and 290 route/operator combinations. Directions are independent: for example, TAY is supplied only on EPWA–LFPG and CAI only on EYVI–LTAI. Missing or invalid pools prevent startup with an explanation; no reverse-route, source-type or B738 fallback is used. Wake category follows the selected type, including heavy widebodies. `track.sourceRoute.operator` and `aircraftTypeSource` record the selection's provenance.
 
-Airborne flights start at 450 kt with AFL = CFL = the sampled level. The initial bearing to the next resolved point determines direction: 000 through just below 180 degrees is eastbound; 180 through just below 360 is westbound.
+Airborne flights start at the type's cruise Mach, converted to TAS at the sampled altitude, with AFL = CFL = that level. The initial bearing to the next resolved point determines direction: 000 through just below 180 degrees is eastbound; 180 through just below 360 is westbound.
 
 - East: 290, 310, 330, 350, 370, 390, 410, 450.
 - West: 280, 300, 320, 340, 360, 380, 400, 430.
 
-These are the supplied pools with the subsequent FL430/FL450 correction. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not override this initial selection. Source variant aircraft types are likewise ignored when spawning. Performance-specific levels and speeds are not modelled.
+These are the supplied pools with the subsequent FL430/FL450 correction. Levels above the selected type's ceiling are removed before sampling, retaining direction and relative weights. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not override this initial selection. Source variant aircraft types are likewise ignored when spawning.
 
 ## Entry and route following
 
@@ -29,7 +29,28 @@ Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N0203
 
 ## Ground departures
 
-Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and 180 knots, immediately following the route. The sampled level is retained as the future cruise target. This is a generic departure, without taxi, runway roll or a published SID.
+Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. The sampled level is retained as the future cruise target; the aircraft holds its current cleared level until the controller clears it higher. This is a generic departure, without taxi, runway roll or a published SID.
+
+## Aircraft performance
+
+The user-supplied `assets/sources/aircraft-performance.txt` defines all 23 available types. `node scripts/import-aircraft-performance.mjs` regenerates `src/data/aircraft-performance.js`; tests compare every field with the original. The repeated unlabelled `210 kt` after E195's MCS is treated as a duplicate, not a second parameter.
+
+| Flight phase | Altitude band | Automatic speed and vertical rate |
+| --- | --- | --- |
+| Initial climb | Below FL050 | Type initial-climb IAS and RoC |
+| Climb | FL050 to below FL150 | Type first-climb IAS and RoC |
+| Climb | FL150 to below FL240 | Type second-climb IAS and RoC |
+| Mach climb | FL240 and above, with a higher CFL | Type climb Mach and RoC |
+| Cruise | Level at FL240 or above | Type cruise Mach; zero vertical speed |
+| Initial descent | Above FL240 | Type descent Mach and RoD |
+| Descent | Above FL100 through FL240 | Type descent IAS and RoD |
+| Approach | FL100 and below while descending | Type approach IAS and RoD |
+
+Lower level-offs retain the relevant climb or descent/approach speed; they do not automatically climb through a clearance. Speeds use the simulator's existing altitude-aware IAS/TAS and Mach/TAS conversions and 5 kt/s acceleration model. The supplied cruise TAS and Mach are not always equivalent, so Mach drives automatic cruise while nominal TAS remains reference data. Manual IAS or Mach instructions take priority; **Clear** restores the automatic schedule without writing an assigned speed into the label.
+
+RoC/RoD are phase defaults and capability limits for vertical-rate requests. Smaller assigned rates are honoured; requests above capability are limited to the current phase's rate. Rate changes retain the existing 1,500 ft/min per second response, and level capture prevents overshoot. Movement uses at most 0.5-second integration steps for profiled types, including heading-only flights, so accelerated time does not skip altitude bands. Spawn levels, level-picker presets, manual level entry and physical movement respect the aircraft ceiling.
+
+Range and minimum clean speed (MCS) are retained as reference fields. There is no fuel/range or flap-configuration model; MCS is not applied as a blanket speed floor because the supplied initial-climb and approach speeds can be below it. Unknown ad hoc types retain generic movement, while the route spawner requires a profile for every configured type.
 
 ## Route coverage and diagnostics
 
@@ -47,12 +68,12 @@ Inspect `state.air.spawner.catalogue.diagnostics` during development or regenera
 node scripts/audit-route-catalogue.mjs
 ```
 
-This report is derived from the actual bundled data, not a maintained exclusion list. Restoring missing fixes automatically restores eligible variants at the next load. No traffic frequency, performance model or automatic spawning timer is added.
+This report is derived from the actual bundled data, not a maintained exclusion list. Restoring missing fixes automatically restores eligible variants at the next load. No traffic frequency or automatic spawning timer is added.
 
 ## Validation
 
 ```sh
-node --test tests/airways.test.mjs tests/routes.test.mjs tests/sectors.test.mjs tests/spawner.test.mjs
+node --test tests/*.test.mjs
 node tests/spawner.browser.cjs
 node tests/track-labels.browser.cjs
 ```

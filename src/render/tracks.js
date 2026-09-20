@@ -2,6 +2,7 @@ import { parseSpeedInstruction } from '../utils/speed.js';
 import { sectorMembershipTitle } from '../radar/sectors.js';
 import { assignHeading, navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
+import { aircraftCeiling } from '../radar/performance.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -1276,6 +1277,7 @@ function openEclPicker(node, anchor){
 }
 
 function createLevelEditor(field, track, node, close, options){
+  const ceiling=Math.min(LEVEL_MAX,aircraftCeiling(track));
   const row = document.createElement('div');
   row.className = 'track-picker__level';
   const header = document.createElement('div');
@@ -1297,9 +1299,9 @@ function createLevelEditor(field, track, node, close, options){
   input.type = 'number';
   input.step = String(LEVEL_STEP);
   input.min = String(LEVEL_MIN);
-  input.max = String(LEVEL_MAX);
+  input.max = String(ceiling);
   input.placeholder = 'Manual level';
-  input.title = 'Press Enter to apply';
+  input.title = `Press Enter to apply (ceiling FL${ceiling})`;
   manual.appendChild(input);
 
   const closeOnSelect = options?.closeOnSelect === true;
@@ -1335,7 +1337,7 @@ function createLevelEditor(field, track, node, close, options){
     if(!Number.isFinite(parsed)){
       return false;
     }
-    const clamped = clampLevelValue(parsed);
+    const clamped = Math.min(clampLevelValue(parsed),ceiling);
     const previous = getTrackLevelValue(track, field.key);
     if(previous !== clamped || typeof track[field.key] !== 'number'){
       track[field.key] = clamped;
@@ -1346,7 +1348,7 @@ function createLevelEditor(field, track, node, close, options){
     return true;
   };
 
-  LEVEL_OPTIONS.forEach(value=>{
+  LEVEL_OPTIONS.filter(value=>value<=ceiling).forEach(value=>{
     const option = createPickerOption(formatFlightLevel(value), false);
     option.dataset.value = String(value);
     option.addEventListener('click', evt=>{

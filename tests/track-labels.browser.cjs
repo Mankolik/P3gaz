@@ -193,7 +193,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       ['.assigned-vertical', {assignedVertical:{value:0,comparator:'exact'},verticalRateAssigned:true}, 0, true],
       ['.level-primary button', {clearedFlightLevel:380}, 380, true],
       ['.level-primary button', {clearedFlightLevel:275}, 280, false],
-      ['.level-exit button', {exitFlightLevel:600}, 600, true],
+      ['.level-exit button', {exitFlightLevel:390}, 390, true],
       ['.level-exit button', {exitFlightLevel:0}, 0, true],
       ['.assigned-ecl', {expectedCruiseLevel:350}, 350, true],
     ]){
@@ -211,7 +211,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       assert.equal(await list.locator('.selected').count(), exact ? 1 : 0, 'nearest preset must not replace manual selection');
       if(selector.includes('level-') || selector === '.assigned-ecl'){
         const values = await list.locator('[data-value]').evaluateAll(options=>options.map(option=>Number(option.dataset.value)));
-        assert.equal(values[0], 600);
+        assert.equal(values[0], 390, 'A21N level options stop at its ceiling');
         assert.equal(values.at(-1), 0);
         assert(values.every((value,i)=>i === 0 || value < values[i-1]), 'levels descend');
       }
@@ -237,6 +237,10 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.keyboard.type('290');
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290);
+    await first.locator('.level-primary button').click();
+    assert.equal(await page.locator('.track-picker input').getAttribute('max'),'390');
+    await page.keyboard.type('450');await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),390,'manual clearance cannot exceed type ceiling');
 
     // Direct-to works with the real navigation catalog and no flight plan.
     assert.equal(await first.locator('.row3 > *').count(),3,'reuse the existing point field without adding a label column');
@@ -265,18 +269,19 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     // Planned traffic is a test fixture only: the application demo stays planless.
     await page.evaluate(()=>{
       const t=window.labelTest.tracks[0];
-      Object.assign(t,{lon:0,lat:0,heading:90,groundSpeed:360,assignedSpeed:null});
+      Object.assign(t,{lon:0,lat:0,heading:90,groundSpeed:360,assignedSpeed:null,
+        aircraftType:'TEST',actualFlightLevel:200,clearedFlightLevel:200,verticalRateAssigned:false});
       window.labelTest.setFlightPlan(t,[{name:'PAST',lon:-0.1,lat:0},{name:'FIRST',lon:0.1,lat:0},{name:'JOIN',lon:0.2,lat:0},{name:'LAST',lon:0.3,lat:0}],1);
       window.labelTest.render();
     });
     await first.locator('.destination').click();
-    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['2. FIRST','3. JOIN','4. LAST']);
+    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['FIRST','JOIN','LAST']);
     await page.locator('[data-plan-index="2"]').click();
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.planIndex),2);
     await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
     assert.equal(await first.locator('.destination').textContent(),'LAST',JSON.stringify(await page.evaluate(()=>window.labelTest.tracks[0])));
     await first.locator('.destination').click();
-    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['4. LAST']);
+    assert.deepEqual(await page.locator('[data-plan-index]').allTextContents(),['LAST']);
     await page.keyboard.press('Escape');
 
     await page.evaluate(()=>{
@@ -287,24 +292,19 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     });
     await first.locator('.destination').click();
     await page.keyboard.type('VIA');
-    await page.locator('input[value="rejoin"]').check();
-    assert(await page.getByRole('textbox',{name:'Return to FPL point',exact:true}).evaluate(el=>el === document.activeElement));
-    await page.keyboard.type('JOIN');
+    assert.equal(await page.locator('input[value="rejoin"]').count(),0);
     await page.keyboard.press('Enter');
-    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.rejoinIndex),1);
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].directTo.rejoinIndex),null);
     await page.evaluate(()=>{window.labelTest.advance(125); window.labelTest.render();});
-    assert.equal(await first.locator('.destination').textContent(),'JOIN');
-    await first.locator('.destination').click();
-    await page.getByRole('button',{name:'Cancel route · hold heading'}).click();
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
 
-    // Choosing End here on a planned track does not resume it or delete the track.
+    // Off-plan entry automatically continues on arrival heading without resuming the FPL.
     await page.evaluate(()=>{
       const t=window.labelTest.tracks[0]; Object.assign(t,{lon:0,lat:0,heading:90});
       window.labelTest.setFlightPlan(t,[{name:'LATER',lon:1,lat:0}]); window.labelTest.render();
     });
     await first.locator('.destination').click(); await page.keyboard.type('VIA');
-    await page.getByRole('button',{name:'Fly direct',exact:true}).click();
+    await page.keyboard.press('Enter');
     await page.evaluate(()=>{window.labelTest.advance(200); window.labelTest.render();});
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].navigationMode),'heading');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks.length),5);
@@ -320,7 +320,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       await page.keyboard.press('Escape');
     }
     await page.setViewportSize({width:1100,height:700});
-    console.log('PASS: immediate typing, direct-to catalog validation, FPL shortcuts/rejoin, end-here, heading override, and narrow direct-to picker');
+    console.log('PASS: ceiling-limited levels, immediate typing, direct-to validation, FPL shortcuts, off-plan heading continuation and narrow picker');
 
     if(process.env.LABEL_DETAIL_SCREENSHOT){
       await page.mouse.click(1090,690);
