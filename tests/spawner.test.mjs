@@ -10,6 +10,7 @@ import {createState} from '../src/core/state.js';
 import {createBus} from '../src/core/bus.js';
 import {updateTrackMovement} from '../src/radar/movement.js';
 import {loadAircraftSpawner} from '../src/data/loader.js';
+import {parseRouteAircraft,applyRouteAircraft} from '../src/radar/route-aircraft.js';
 
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const json=p=>JSON.parse(read(p));
@@ -19,7 +20,8 @@ const resolver=createAirwayResolver(json('assets/navigation/pansa-airways.json')
 const firData=json('assets/geojson/flightmap_europe_fir_uir.json');
 const fir=createFirBoundary(firData);
 const groups=parseRouteCatalogue(read('assets/sources/Airporty_revamped.txt'));
-const catalogue=compileRouteCatalogue(groups,resolver,fir);
+const pools=parseRouteAircraft(read('assets/sources/route-aircraft-types.txt'));
+const catalogue=applyRouteAircraft(compileRouteCatalogue(groups,resolver,fir),pools);
 const p=(name,lon,lat=5)=>({name,lon,lat});
 const square=(holes=[])=>createFirBoundary({features:[{properties:{name:'EPWW'},geometry:{type:'Polygon',
   coordinates:[[[0,0],[10,0],[10,10],[0,10],[0,0]],...holes]}}]});
@@ -209,12 +211,13 @@ test('directional pools, wraparound headings and mild FL340/350 weighting',()=>{
   }
 });
 
-test('selection draws pair then callsign then variant, independent of variant counts',()=>{
+test('selection draws pair then callsign then variant then operator type independently',()=>{
   const g=only('KJFK','EPWA').groups[0],other=only('EPWA','EPKK').groups[0];
-  const rolls=[0.75,0.75,0.9,0],s=state();
-  const spawner=createAircraftSpawner({groups:[g,{...other,callsigns:['TEST1','TEST2']}]},{random:()=>rolls.shift()});
+  const rolls=[0.75,0.75,0.9,0,0],s=state();
+  const spawner=createAircraftSpawner({groups:[g,{...other,callsigns:['LOT1','LOT2']}]},{random:()=>rolls.shift()});
   const t=spawner.spawn(s);
-  assert.equal(t.departure,'EPWA');assert.equal(t.callsign,'TEST2');assert.equal(t.aircraftType,other.variants[2].aircraftType);
+  assert.equal(t.departure,'EPWA');assert.equal(t.callsign,'LOT2');assert.equal(t.aircraftType,'E170');
+  assert.equal(t.sourceRoute.sourceLine,other.variants[2].sourceLine);
   assert.equal(rolls.length,0);
 });
 
@@ -233,9 +236,50 @@ test('heading follows the onward spawn leg and metadata preserves original route
 });
 
 test('startup loads the source catalogue and fails clearly if navigation or routes are unavailable',async t=>{
-  t.mock.method(globalThis,'fetch',async()=>({ok:true,text:async()=>read('assets/sources/Airporty_revamped.txt')}));
+  t.mock.method(globalThis,'fetch',async url=>({ok:true,text:async()=>read('assets/sources/'+String(url).split('/').at(-1))}));
   const spawner=await loadAircraftSpawner(resolver,firData);assert(spawner.catalogue.groups.length>100);
   await assert.rejects(()=>loadAircraftSpawner(null,firData),/Navigation/);
   t.mock.method(globalThis,'fetch',async()=>({ok:false}));
   await assert.rejects(()=>loadAircraftSpawner(resolver,firData),/Failed to load/);
+});
+
+test('all 184 directional routes and 290 operator pools exactly cover catalogue callsigns',()=>{
+  assert.equal(pools.size,184);
+  assert.equal([...pools.values()].reduce((n,ops)=>n+Object.keys(ops).length,0),290);
+  for(const g of groups){
+    const ops=pools.get(`${g.departure}-${g.destination}`);
+    assert.deepEqual(Object.keys(ops).sort(),[...new Set(g.callsigns.map(c=>c.slice(0,3)))].sort());
+  }
+  assert.deepEqual(pools.get('EPWA-LFPG').TAY,['B734','B738']);
+  assert.equal(pools.get('LFPG-EPWA').TAY,undefined);
+  assert.deepEqual(pools.get('EYVI-LTAI').CAI,['B738','B38M']);
+  assert.equal(pools.get('LTAI-EYVI').CAI,undefined);
+});
+
+test('every supplied aircraft type can spawn for its operator regardless of route type or level',()=>{
+  for(const g of catalogue.groups)for(const [operator,types] of Object.entries(g.aircraftTypesByOperator)){
+    const callsign=g.callsigns.find(c=>c.startsWith(operator));
+    for(const [index,type] of types.entries()){
+      const variant={...g.variants[0],aircraftType:'ZZZZ',sourceFlightLevel:999};
+      const rolls=[0,0,0,(index+0.5)/types.length,0];
+      const t=createAircraftSpawner({groups:[{...g,callsigns:[callsign],variants:[variant]}]},{random:()=>rolls.shift()}).spawn(state());
+      assert.equal(t.aircraftType,type,`${g.departure}-${g.destination} / ${operator}`);
+      assert.equal(t.sourceRoute.operator,operator);
+      assert.equal(t.sourceRoute.aircraftTypeSource,'route-operator-pool');
+      assert.equal(t.wake,/^(B74|B77|B78|A33|A34|A35|A38)/.test(type)?'H':'M');
+      assert.notEqual(t.expectedCruiseLevel,999);
+      assert.equal(rolls.length,0);
+    }
+  }
+});
+
+test('invalid or missing aircraft pools fail without defaulting to source types',async t=>{
+  for(const input of ['', 'EPWA-EPKK', 'LOT E170', 'EPWA-EPKK\nLOT',
+    'EPWA-EPKK\nLOT E170\nLOT E195','EPWA-EPKK\nLOT E170\nEPWA-EPKK\nLOT E195'])
+    assert.throws(()=>parseRouteAircraft(input));
+  const g=only('EPWA','EPKK').groups[0];
+  assert.throws(()=>applyRouteAircraft({groups:[g]},new Map()),/Missing aircraft pool/);
+  assert.throws(()=>createAircraftSpawner({groups:[{...g,aircraftTypesByOperator:{}}]}),/aircraft pool/);
+  t.mock.method(globalThis,'fetch',async url=>({ok:!String(url).endsWith('route-aircraft-types.txt'),text:async()=>read('assets/sources/Airporty_revamped.txt')}));
+  await assert.rejects(()=>loadAircraftSpawner(resolver,firData),/Failed to load the route aircraft pools/);
 });

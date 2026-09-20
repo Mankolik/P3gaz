@@ -20,6 +20,11 @@ export function selectFlightLevel(heading, random=Math.random) {
 
 export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
   if(!catalogue.groups.length) throw new Error('No routes are ready to spawn.');
+  for(const group of catalogue.groups)for(const callsign of group.callsigns) {
+    const types=group.aircraftTypesByOperator?.[callsign.slice(0,3)];
+    if(!Array.isArray(types) || !types.length || types.some(type=>! /^[A-Z0-9]{2,4}$/.test(type)))
+      throw new Error(`Missing or invalid aircraft pool for ${group.departure}-${group.destination} / ${callsign.slice(0,3)}.`);
+  }
   let sequence=0;
   function spawn(state) {
     const active=new Set(state.air.tracks.map(t=>t.callsign));
@@ -27,6 +32,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     if(!available.length) throw new Error('All catalogue callsigns are already in use.');
     // Keep the airport-pair, callsign, route draws independent and in that order.
     const group=choose(available,random),callsign=choose(group.callsigns,random),variant=choose(group.variants,random);
+    const operator=callsign.slice(0,3),aircraftType=choose(group.aircraftTypesByOperator[operator],random);
     const position=variant.waypoints[variant.spawnIndex],next=variant.waypoints[variant.spawnIndex+1];
     const heading=bearingToPoint(position,next),level=selectFlightLevel(heading,random);
     let id;
@@ -35,15 +41,14 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const track=createTrack({id,callsign,status:'accepted',lon:position.lon,lat:position.lat,heading,
       groundSpeed:ground?180:450,verticalSpeed:0,actualFlightLevel:ground?10:level,
       clearedFlightLevel:ground?10:level,plannedEntryLevel:level,exitFlightLevel:level,expectedCruiseLevel:level,
-      // Overflight rows do not supply types: B738 is an explicit temporary sim default.
-      aircraftType:variant.aircraftType||'B738',wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(variant.aircraftType||'')?'H':'M',
+      aircraftType,wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(aircraftType)?'H':'M',
       destination:group.destination,flightPlan:{waypoints:variant.waypoints,nextIndex:variant.spawnIndex+1},
       // Airport departures start airborne, ready to follow their route.
       departure:group.departure,onGround:false,
     },state.map.project);
     track.sourceRoute={departure:group.departure,destination:group.destination,route:variant.route,
       sourceLine:variant.sourceLine,sourceFlightLevel:variant.sourceFlightLevel,annotations:variant.annotations,
-      omittedPoints:variant.omittedPoints,aircraftTypeDefaulted:!variant.aircraftType};
+      omittedPoints:variant.omittedPoints,operator,aircraftTypeSource:'route-operator-pool'};
     track.spawnPoint=position.name;
     state.air.tracks.push(track);
     updateTrackSectors(state);
