@@ -4,14 +4,16 @@ Use **+ Aircraft** at the top right. Each click creates one **accepted** track. 
 
 ## Selection and levels
 
-The source is `assets/sources/Airporty_revamped.txt`. Choose an eligible departure/destination pair uniformly, then an unused callsign from that pair, then a valid route variant. Pairs with more variants do not get more traffic. Active callsigns and track IDs are unique. All callsigns exhausted produces a message and no new track.
+Routes and callsigns come from `assets/sources/Airporty_revamped.txt`. Choose an eligible departure/destination pair uniformly, then an unused callsign from that pair, then a valid route variant, then an aircraft type uniformly from that directional pair's operator pool. The operator is the callsign's first three letters. Pairs with more variants or more aircraft types do not get more traffic. Active callsigns and track IDs are unique. All callsigns exhausted produces a message and no new track.
+
+`assets/sources/route-aircraft-types.txt` contains the user's aircraft list for all 184 directional pairs and 290 route/operator combinations. Directions are independent: for example, TAY is supplied only on EPWA–LFPG and CAI only on EYVI–LTAI. Missing or invalid pools prevent startup with an explanation; no reverse-route, source-type or B738 fallback is used. Wake category follows the selected type, including heavy widebodies. `track.sourceRoute.operator` and `aircraftTypeSource` record the selection's provenance.
 
 Airborne flights start at 450 kt with AFL = CFL = the sampled level. The initial bearing to the next resolved point determines direction: 000 through just below 180 degrees is eastbound; 180 through just below 360 is westbound.
 
 - East: 290, 310, 330, 350, 370, 390, 410, 450.
 - West: 280, 300, 320, 340, 360, 380, 400, 430.
 
-These are the supplied pools with the subsequent FL430/FL450 correction. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute`; they do not override this initial selection. Aircraft type comes from the variant. Rows without a type use an explicit temporary B738 default, recorded in metadata. Performance-specific levels and speeds are not modelled.
+These are the supplied pools with the subsequent FL430/FL450 correction. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not override this initial selection. Source variant aircraft types are likewise ignored when spawning. Performance-specific levels and speeds are not modelled.
 
 ## Entry and route following
 
@@ -27,7 +29,7 @@ Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N0203
 
 ## Ground departures
 
-Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start stationary at their airport reference point. The current airport dataset has no elevations, so the simulator uses AFL/CFL 000 as its ground baseline. The selected level is retained as the future cruise target. **Set both a positive speed and a CFL above the ground level to depart.** This releases the track into the existing acceleration, climb and route-following model. Setting only one clearance leaves it grounded. This is a generic departure, without taxi, runway roll or a published SID.
+Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and 180 knots, immediately following the route. The sampled level is retained as the future cruise target. This is a generic departure, without taxi, runway roll or a published SID.
 
 ## Route coverage and diagnostics
 
@@ -55,4 +57,4 @@ node tests/spawner.browser.cjs
 node tests/track-labels.browser.cjs
 ```
 
-Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, weighted levels, ground holds and release, duplicate prevention, startup failures, real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.
+Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, every supplied operator/type choice, directional pool differences, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, weighted levels, moving FL010 departures, duplicate prevention, startup failures (including unavailable aircraft pools), real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.
