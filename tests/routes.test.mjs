@@ -88,6 +88,28 @@ test('off-route direct rejoins the chosen FPL point after the new point',()=>{
   assert.equal(navigationTarget(track).name,'LAST');
 });
 
+test('typing an FPL point automatically shortcuts and sequences the onward route',()=>{
+  const track=aircraft();
+  setFlightPlan(track,[point('SUBIX',0.1),point('MASIV',0.2),point('BIMPA',0.3)]);
+  assignDirectTo(track,point(' masiv ',0.2));
+  assert.equal(track.directTo.planIndex,1);
+  assert.deepEqual(remainingPlanPoints(track).map(p=>p.name),['MASIV','BIMPA']);
+  advance(track,125);
+  assert.equal(navigationTarget(track).name,'BIMPA');
+  assert.equal(track.navigationMode,'route');
+});
+
+test('same-name off-plan locations and passed points do not resume a flight plan',()=>{
+  const track=aircraft();
+  setFlightPlan(track,[point('PAST',0.1),point('NEXT',0.2)],1);
+  for(const target of [point('NEXT',0.3),point('PAST',0.1)]){
+    assignDirectTo(track,target);
+    assert.equal(track.directTo.planIndex,null);
+    assert.equal(track.directTo.rejoinIndex,null);
+    assert.equal(track.flightPlan.nextIndex,1);
+  }
+});
+
 test('ending an off-route direct suspends an existing plan; explicit heading cancels navigation',()=>{
   const track=aircraft();
   setFlightPlan(track,[point('LATER',1)]);

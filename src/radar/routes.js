@@ -58,6 +58,11 @@ export function assignHeading(track, heading=null){
 export function assignDirectTo(track, point, {planIndex=null,rejoinIndex=null}={}){
   if(!validPoint(point)) throw new Error('Choose a known point.');
   const remaining = remainingPlanPoints(track);
+  // Typed points follow the same shortcut semantics as selecting an FPL row.
+  if(planIndex == null && rejoinIndex == null){
+    planIndex = remaining.find(p=>pointName(p.name) === pointName(point.name)
+      && p.lon === point.lon && p.lat === point.lat)?.index ?? null;
+  }
   const planned = remaining.find(p=>p.index === planIndex);
   const rejoin = remaining.find(p=>p.index === rejoinIndex);
   if(planIndex != null && (!planned || !validPoint(planned) || planned.lon !== point.lon || planned.lat !== point.lat

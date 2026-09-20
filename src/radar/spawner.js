@@ -33,12 +33,13 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     do {id=`spawn-${++sequence}`;} while(state.air.tracks.some(t=>t.id===id));
     const ground=variant.groundStart;
     const track=createTrack({id,callsign,status:'accepted',lon:position.lon,lat:position.lat,heading,
-      groundSpeed:ground?0:450,verticalSpeed:0,actualFlightLevel:ground?0:level,
-      clearedFlightLevel:ground?0:level,plannedEntryLevel:level,exitFlightLevel:level,expectedCruiseLevel:level,
+      groundSpeed:ground?180:450,verticalSpeed:0,actualFlightLevel:ground?10:level,
+      clearedFlightLevel:ground?10:level,plannedEntryLevel:level,exitFlightLevel:level,expectedCruiseLevel:level,
       // Overflight rows do not supply types: B738 is an explicit temporary sim default.
       aircraftType:variant.aircraftType||'B738',wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(variant.aircraftType||'')?'H':'M',
       destination:group.destination,flightPlan:{waypoints:variant.waypoints,nextIndex:variant.spawnIndex+1},
-      departure:group.departure,onGround:ground,
+      // Airport departures start airborne, ready to follow their route.
+      departure:group.departure,onGround:false,
     },state.map.project);
     track.sourceRoute={departure:group.departure,destination:group.destination,route:variant.route,
       sourceLine:variant.sourceLine,sourceFlightLevel:variant.sourceFlightLevel,annotations:variant.annotations,

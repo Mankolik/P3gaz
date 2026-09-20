@@ -54,3 +54,17 @@ test('invalid or unavailable projection never draws a shortcut across missing ge
   const none=recorder();drawTrackRoutes(none.ctx,{z:1},[t],null);
   assert.deepEqual(none.calls,[]);
 });
+
+test('hover adds a cyan aircraft-to-fix segment while preserving the green route',()=>{
+  const t=aircraft(),before=JSON.stringify(t),{ctx,calls}=recorder();
+  const strokes=[];ctx.stroke=()=>strokes.push(ctx.strokeStyle);
+  drawTrackRoutes(ctx,{z:2},[t],(lon,lat)=>[lon*100,lat*100],t,fixes[2]);
+  assert.deepEqual(strokes,['#00ff55','#00ffff']);
+  assert.deepEqual(calls.filter(c=>c[0]==='lineTo').at(-1),['lineTo',200,100]);
+  assert.equal(ctx.lineWidth,0.75);
+  assert.equal(JSON.stringify(t),before);
+  const cleared=recorder();drawTrackRoutes(cleared.ctx,{z:1},[t],(lon,lat)=>[lon,lat],t);
+  assert.equal(cleared.calls.filter(c=>c[0]==='lineTo').length,3);
+  const closed=recorder();drawTrackRoutes(closed.ctx,{z:1},[t],(lon,lat)=>[lon,lat],null,fixes[2]);
+  assert(!closed.calls.some(c=>c[0]==='lineTo'));
+});

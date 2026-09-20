@@ -1,7 +1,7 @@
 import { parseSpeedInstruction } from '../utils/speed.js';
 import { sectorMembershipTitle } from '../radar/sectors.js';
 import { assignHeading, navigationTarget } from '../radar/routes.js';
-import { buildDirectToPicker } from '../ui/direct-to-picker.js';
+import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -63,6 +63,10 @@ const shortcutDocuments = new WeakSet();
 export function getRoutePreviewTrack(){
   return activeTrackPicker?.panel?.isConnected && activeTrackPicker.panel.dataset.type === 'direct-to'
     ? activeTrackPicker.node.track : null;
+}
+
+export function getRoutePreviewPoint(){
+  return getRoutePreviewTrack() ? getDirectToPreviewPoint(activeTrackPicker.panel) : null;
 }
 
 function bindRouteShortcut(doc){

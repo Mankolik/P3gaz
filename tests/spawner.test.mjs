@@ -84,7 +84,7 @@ test('supplied point corrections restore routes without bypassing missing points
   for(const destination of ['EETN','EYVI']){
     const g=only('LKPR',destination).groups[0];
     const t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(state());
-    assert.equal(t.onGround,true);assert.equal(t.spawnPoint,'LKPR');
+    assert.equal(t.onGround,false);assert.equal(t.spawnPoint,'LKPR');
     assert.equal(navigationTarget(t).name,'OKL');
   }
   assert(only('EGSS','EPBY').groups[0].variants[0].waypoints.some(p=>p.name==='PAM'));
@@ -182,18 +182,17 @@ test('every eligible airborne variant spawns outside with two prior points and a
   }
 });
 
-test('all EPWW airport departures and EYVI/LKPR/EDDB start stationary at the airport',()=>{
+test('airport departures start airborne at FL010 and 180 knots and immediately follow the route',()=>{
   for(const departure of ['EPWA','EPKK','EYVI','LKPR','EDDB']){
     const g=catalogue.groups.find(g=>g.departure===departure);
     assert(g,departure);
     const s=state(),t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(s);
-    assert.equal(t.onGround,true);assert.equal(t.spawnPoint,departure);
-    assert.equal(t.actualFlightLevel,0);assert.equal(t.groundSpeed,0);
+    assert.equal(t.onGround,false);assert.equal(t.spawnPoint,departure);
+    assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);assert.equal(t.groundSpeed,180);
     const location=[t.lon,t.lat];updateTrackMovement(s,60);
-    assert.deepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,0);
-    t.clearedFlightLevel=100;updateTrackMovement(s,10);assert.equal(t.onGround,true);
-    t.assignedSpeed={mode:'IAS',value:180};updateTrackMovement(s,10);
-    assert.equal(t.onGround,false);assert(t.groundSpeed>0);assert(t.actualFlightLevel>0);
+    assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,10);assert.equal(t.groundSpeed,180);
+    t.clearedFlightLevel=100;updateTrackMovement(s,10);
+    assert(t.actualFlightLevel>10);
   }
 });
 
