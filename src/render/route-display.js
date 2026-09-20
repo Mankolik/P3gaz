@@ -19,7 +19,7 @@ export function routeDisplayPoints(track){
 }
 
 // Called in the map's world transform. Symbols and names keep a fixed CSS size.
-export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null){
+export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null,previewPoint=null){
   if(typeof project !== 'function') return;
   const scale=1/Math.max(camera.z || 1,1e-6);
   ctx.save();
@@ -61,6 +61,19 @@ export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null){
       ctx.strokeText(name,x+7*scale,y-7*scale);
       ctx.fillText(name,x+7*scale,y-7*scale);
       ctx.restore();
+    }
+  }
+  // Add the proposed shortcut over the green route without changing navigation.
+  if(previewTrack && tracks.includes(previewTrack) && validPoint(previewPoint)
+    && Number.isFinite(previewTrack.x) && Number.isFinite(previewTrack.y)){
+    const xy=project(previewPoint.lon,previewPoint.lat);
+    if(xy && Number.isFinite(xy[0]) && Number.isFinite(xy[1])){
+      ctx.strokeStyle='#00ffff';
+      ctx.lineWidth=1.5*scale;
+      ctx.beginPath();
+      ctx.moveTo(previewTrack.x,previewTrack.y);
+      ctx.lineTo(xy[0],xy[1]);
+      ctx.stroke();
     }
   }
   ctx.restore();

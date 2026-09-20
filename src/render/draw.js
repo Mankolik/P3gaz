@@ -1,5 +1,5 @@
 import { getVisibleLayers } from './layers.js';
-import { drawTrackSymbols, projectTracksToScreen, syncTrackLabels, drawTrackConnectors, getRoutePreviewTrack } from './tracks.js';
+import { drawTrackSymbols, projectTracksToScreen, syncTrackLabels, drawTrackConnectors, getRoutePreviewTrack, getRoutePreviewPoint } from './tracks.js';
 import { drawTrackRoutes } from './route-display.js';
 
 const LAYER_STYLES = {
@@ -99,7 +99,7 @@ export function drawFrame(canvas, camera, state, overlay){
   ctx.globalCompositeOperation = 'source-over';
   const tracks = state?.air?.tracks || [];
   if(tracks.length){
-    drawTrackRoutes(ctx,camera,tracks,state.map.project,getRoutePreviewTrack());
+    drawTrackRoutes(ctx,camera,tracks,state.map.project,getRoutePreviewTrack(),getRoutePreviewPoint());
     drawTrackSymbols(ctx, camera, tracks);
   }
   ctx.restore();

@@ -99,14 +99,8 @@ header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; al
 .direct-to__input{ text-transform:uppercase; }
 .direct-to__hint{ color:var(--text-dim); font-size:11px; }
 .track-picker .direct-to__points{ max-height:130px; flex-shrink:0; }
-.direct-to__after{ margin:0; padding:6px; border:1px solid var(--stroke); border-radius:6px; min-width:0; }
-.direct-to__after legend{ color:var(--text-dim); font-size:11px; }
-.direct-to__choice{ display:flex; align-items:center; gap:5px; padding:3px 0; font-size:11px; cursor:pointer; }
-.direct-to__choice input{ margin:0; }
-.track-picker .direct-to__return-points{ max-height:72px; margin-top:4px; }
 .direct-to__error{ color:#ff9292; font-size:11px; }
 .direct-to__error:empty{ display:none; }
-.direct-to__actions{ display:flex; flex-direction:column; gap:4px; }
 button.direct-to__apply{ background:#15372c; border-color:#276348; text-align:center; }
 .dropdown-search{ margin-bottom:6px; }
 .dropdown-panel [hidden]{ display:none !important; }
