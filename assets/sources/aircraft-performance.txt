@@ -1,0 +1,1105 @@
+Aircraft performance
+A319
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2200 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1000 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.79
+
+Ceiling FL 390
+
+Range 1800 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 230 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+A320
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1400 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1000 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.79
+
+Ceiling FL 390
+
+Range 2700 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+A20N
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2200 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1000 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.78
+
+Ceiling FL 390
+
+Range 3500 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3000 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+A321
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1800 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1000 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.79
+
+Ceiling FL 410
+
+Range 2350 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 2500 ft/min
+Approach
+
+IAS 225 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+A21N
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2000 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1200 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1000 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.78
+
+Ceiling FL 390
+
+Range 4000 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 2500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1300 ft/min
+
+MCS 210 kt
+
+A339
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2000 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1200 ft/min
+MACH climb
+
+MACH 0.80
+
+ROC 1000 ft/min
+Cruise
+
+TAS 475 kt
+
+MACH 0.81
+
+Ceiling FL 410
+
+Range 7200 NM
+Initial Descent (to FL 240)
+
+MACH 0.81
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3000 ft/min
+Approach
+
+IAS 220 kt
+
+ROD 1500 ft/min
+
+MCS 200 kt
+
+BCS1
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 3500 ft/min
+Climb (to FL 150)
+
+IAS 280 kts
+
+ROC 2500 ft/min
+Climb (to FL 240)
+
+IAS 280 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.76
+
+ROC 1800 ft/min
+Cruise
+
+TAS 445 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 3400 NM
+Initial Descent (to FL 240)
+
+MACH 0.77
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 250 kt
+
+ROD 2200 ft/min
+Approach
+
+IAS 210 kt
+
+ROD 1700 ft/min
+
+MCS 190 kt
+
+BCS3
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 3100 ft/min
+Climb (to FL 150)
+
+IAS 280 kts
+
+ROC 2600 ft/min
+Climb (to FL 240)
+
+IAS 280 kts
+
+ROC 1800 ft/min
+MACH climb
+
+MACH 0.76
+
+ROC 1500 ft/min
+Cruise
+
+TAS 445 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 3350 NM
+Initial Descent (to FL 240)
+
+MACH 0.77
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 250 kt
+
+ROD 2200 ft/min
+Approach
+
+IAS 210 kt
+
+ROD 1700 ft/min
+
+MCS 190 kt
+
+B734
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 270 kts
+
+ROC 2500 ft/min
+Climb (to FL 240)
+
+IAS 270 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.70
+
+ROC 1000 ft/min
+Cruise
+
+TAS 430 kt
+
+MACH 0.74
+
+Ceiling FL 370
+
+Range 2100 NM
+Initial Descent (to FL 240)
+
+MACH 0.74
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 280 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+B738
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1500 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.79
+
+Ceiling FL 410
+
+Range 2000 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 800 ft/min
+Descent (to FL 100)
+
+IAS 280 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+B739
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.72
+
+ROC 1500 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2745 NM
+Initial Descent (to FL 240)
+
+MACH 0.79
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 280 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+B38M
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2300 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.78
+
+ROC 1500 ft/min
+Cruise
+
+TAS 453 kt
+
+MACH 0.79
+
+Ceiling FL 410
+
+Range 3550 NM
+Initial Descent (to FL 240)
+
+MACH 0.78
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 215 kt
+
+B77L
+Initial climb (to 5000ft)
+
+IAS 175 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 280 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 280 kts
+
+ROC 1500 ft/min
+MACH climb
+
+MACH 0.83
+
+ROC 2000 ft/min
+Cruise
+
+TAS 490 kt
+
+MACH 0.84
+
+Ceiling FL 430
+
+Range 9380 NM
+Initial Descent (to FL 240)
+
+MACH 0.84
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 240 kt
+
+ROD 3000 ft/min
+Approach
+
+IAS 210 kt
+
+ROD 2000 ft/min
+
+MCS 240 kt
+
+B77W
+Initial climb (to 5000ft)
+
+IAS 200 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2500 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.83
+
+ROC 1500 ft/min
+Cruise
+
+TAS 490 kt
+
+MACH 0.84
+
+Ceiling FL 430
+
+Range 7930 NM
+Initial Descent (to FL 240)
+
+MACH 0.84
+
+ROD 1000 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 3000 ft/min
+Approach
+
+IAS 240 kt
+
+ROD 1500 ft/min
+
+MCS 250 kt
+
+B788
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 2700 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+MACH climb
+
+MACH 0.79
+
+ROC 1500 ft/min
+Cruise
+
+TAS 470 kt
+
+MACH 0.85
+
+Ceiling FL 430
+
+Range 8000 NM
+Initial Descent (to FL 240)
+
+MACH 0.84
+
+ROD 2600 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 2800 ft/min
+Approach
+
+IAS 240 kt
+
+ROD 1500 ft/min
+
+MCS 220 kt
+
+B789
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 2700 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1500 ft/min
+MACH climb
+
+MACH 0.84
+
+ROC 1000 ft/min
+Cruise
+
+TAS 490 kt
+
+MACH 0.85
+
+Ceiling FL 430
+
+Range 7565 NM
+Initial Descent (to FL 240)
+
+MACH 0.85
+
+ROD 2500 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 2500 ft/min
+Approach
+
+IAS 240 kt
+
+ROD 1500 ft/min
+
+MCS 210 kt
+
+CRJ9
+Initial climb (to 5000ft)
+
+IAS 165 kts
+
+ROC 2500 ft/min
+Climb (to FL 150)
+
+IAS 290 kts
+
+ROC 2000 ft/min
+Climb (to FL 240)
+
+IAS 290 kts
+
+ROC 1800 ft/min
+MACH climb
+
+MACH 0.72
+
+ROC 1300 ft/min
+Cruise
+
+TAS 450 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 1550 NM
+Initial Descent (to FL 240)
+
+MACH 0.72
+
+ROD 1500 ft/min
+Descent (to FL 100)
+
+IAS 290 kt
+
+ROD 3500 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 1500 ft/min
+
+MCS 185 kt
+
+E170
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3400 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2800 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2200 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1600 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2100 NM
+Initial Descent (to FL 240)
+
+MACH 0.76
+
+ROD 2300 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 2600 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 2000 ft/min
+
+MCS 210 kt
+
+E75L
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3400 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2800 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2200 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1600 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2100 NM
+Initial Descent (to FL 240)
+
+MACH 0.76
+
+ROD 2300 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 2600 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 2000 ft/min
+
+MCS 210 kt
+
+E75S
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3400 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2800 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2200 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1600 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2100 NM
+Initial Descent (to FL 240)
+
+MACH 0.76
+
+ROD 2300 ft/min
+Descent (to FL 100)
+
+IAS 300 kt
+
+ROD 2600 ft/min
+Approach
+
+IAS 250 kt
+
+ROD 2000 ft/min
+
+MCS 210 kt
+
+E190
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3400 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2800 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2200 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1800 ft/min
+Cruise
+
+TAS 460 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2400 NM
+Initial Descent (to FL 240)
+
+MACH 0.75
+
+ROD 2100 ft/min
+Descent (to FL 100)
+
+IAS 250 kt
+
+ROD 2200 ft/min
+Approach
+
+IAS 230 kt
+
+ROD 1600 ft/min
+
+MCS 210 kt
+
+E195
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2500 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1500 ft/min
+Cruise
+
+TAS 447 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2300 NM
+Initial Descent (to FL 240)
+
+MACH 0.76
+
+ROD 2000 ft/min
+Descent (to FL 100)
+
+IAS 250 kt
+
+ROD 2500 ft/min
+Approach
+
+IAS 230 kt
+
+ROD 1600 ft/min
+
+MCS 210 kt
+210 kt
+
+E295
+Initial climb (to 5000ft)
+
+IAS 190 kts
+
+ROC 3000 ft/min
+Climb (to FL 150)
+
+IAS 300 kts
+
+ROC 2500 ft/min
+Climb (to FL 240)
+
+IAS 300 kts
+
+ROC 2000 ft/min
+MACH climb
+
+MACH 0.75
+
+ROC 1500 ft/min
+Cruise
+
+TAS 447 kt
+
+MACH 0.78
+
+Ceiling FL 410
+
+Range 2300 NM
+Initial Descent (to FL 240)
+
+MACH 0.76
+
+ROD 2000 ft/min
+Descent (to FL 100)
+
+IAS 250 kt
+
+ROD 2500 ft/min
+Approach
+
+IAS 230 kt
+
+ROD 1600 ft/min
+
+MCS 210 kt
