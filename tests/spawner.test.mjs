@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createFirBoundary,findSpawnIndex} from '../src/radar/fir-boundary.js';
 import {parseRouteCatalogue,tokenizeRoute,compileRouteCatalogue} from '../src/radar/route-catalogue.js';
-import {createAircraftSpawner,selectFlightLevel,flightLevelWeights,FLIGHT_LEVELS} from '../src/radar/spawner.js';
+import {createAircraftSpawner} from '../src/radar/spawner.js';
 import {createAirwayResolver} from '../src/radar/airways.js';
 import {createNavigationIndex,navigationTarget,bearingToPoint} from '../src/radar/routes.js';
 import {createState} from '../src/core/state.js';
@@ -125,7 +125,7 @@ test('real KJFK arrival starts at BIVKI, with SONAL and BINKA ahead and expanded
   const s=state(),t=createAircraftSpawner(only('KJFK','EPWA'),{random:()=>0}).spawn(s);
   assert.equal(t.status,'accepted');assert.equal(t.onGround,false);
   assert.equal(t.spawnPoint,'BIVKI');assert.equal(navigationTarget(t).name,'SONAL');
-  assert(FLIGHT_LEVELS.east.includes(t.actualFlightLevel));
+  assert.equal(t.actualFlightLevel,t.expectedCruiseLevel);
   assert.equal(t.actualFlightLevel,t.clearedFlightLevel);
   assert.equal(t.groundSpeed,convertMachToTas(aircraftPerformance(t.aircraftType).cruise.mach,t.actualFlightLevel*100));
   const before={lon:t.lon,lat:t.lat};updateTrackMovement(s,10);
@@ -205,22 +205,9 @@ test('airport departures start at FL010 / IAS180 and adopt type speed while hold
   }
 });
 
-test('directional pools, wraparound headings and mild FL340/350 weighting',()=>{
-  assert.deepEqual(FLIGHT_LEVELS.east,[290,310,330,350,370,390,410,450]);
-  assert.deepEqual(FLIGHT_LEVELS.west,[280,300,320,340,360,380,400,430]);
-  for(const heading of [0,90,179.999,180,270,359.999,360,-1]){
-    const expected=((heading%360)+360)%360<180?FLIGHT_LEVELS.east:FLIGHT_LEVELS.west;
-    const counts=new Map();
-    for(let i=0;i<10000;i++){const fl=selectFlightLevel(heading,()=>i/10000);assert(expected.includes(fl));counts.set(fl,(counts.get(fl)||0)+1);}
-    const peak=expected===FLIGHT_LEVELS.east?350:340;
-    assert(counts.get(peak)>counts.get(expected[0]));
-    assert.equal(flightLevelWeights(heading).find(x=>x.level===peak).weight,2);
-  }
-});
-
 test('selection draws pair then callsign then variant then operator type independently',()=>{
   const g=only('KJFK','EPWA').groups[0],other=only('EPWA','EPKK').groups[0];
-  const rolls=[0.75,0.75,0.9,0,0,0.5],s=state();
+  const rolls=[0.75,0.75,0.9,0,0.5],s=state();
   const spawner=createAircraftSpawner({groups:[g,{...other,callsigns:['LOT1','LOT2']}]},{random:()=>rolls.shift()});
   const t=spawner.spawn(s);
   assert.equal(t.departure,'EPWA');assert.equal(t.callsign,'LOT2');assert.equal(t.aircraftType,'E170');
@@ -269,7 +256,7 @@ test('every supplied aircraft type can spawn for its operator regardless of rout
     const callsign=g.callsigns.find(c=>c.startsWith(operator));
     for(const [index,type] of types.entries()){
       const variant={...g.variants[0],aircraftType:'ZZZZ',sourceFlightLevel:999};
-      const rolls=[0,0,0,(index+0.5)/types.length,0,0.5];
+      const rolls=[0,0,0,(index+0.5)/types.length,0.5];
       const t=createAircraftSpawner({groups:[{...g,callsigns:[callsign],variants:[variant]}]},{random:()=>rolls.shift()}).spawn(state());
       assert.equal(t.aircraftType,type,`${g.departure}-${g.destination} / ${operator}`);
       assert.equal(t.sourceRoute.operator,operator);
@@ -324,7 +311,7 @@ test('legacy aircraft/level annotations do not influence ECL, type or empty init
 test('ECL uses airport general track and changes independently of initial XFL and spawn altitude',()=>{
   const g=only('EPWA','EPKK').groups[0];
   const spawn=(generalTrack,lastRoll)=>{
-    const rolls=[0,0,0,0,0,lastRoll];
+    const rolls=[0,0,0,0,lastRoll];
     return createAircraftSpawner({groups:[{...g,generalTrack}]},{random:()=>rolls.shift()}).spawn(state());
   };
   const west=spawn(270,0.5),east=spawn(90,0.5),higher=spawn(90,1);
@@ -332,4 +319,16 @@ test('ECL uses airport general track and changes independently of initial XFL an
   for(const t of [west,east,higher]){
     assert.equal(t.exitFlightLevel,null);assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);
   }
+});
+
+test('all arrivals and overflights spawn at calculated ECL; departures retain FL010',()=>{
+  let airborne=0,departures=0;
+  for(const group of catalogue.groups)for(const variant of group.variants){
+    const t=createAircraftSpawner({groups:[{...group,variants:[variant]}]},{random:()=>0.5}).spawn(state());
+    const expected=variant.groundStart?10:t.expectedCruiseLevel;
+    assert.equal(t.actualFlightLevel,expected);assert.equal(t.clearedFlightLevel,expected);
+    assert.equal(t.plannedEntryLevel,t.expectedCruiseLevel);assert.equal(t.exitFlightLevel,null);
+    if(variant.groundStart)departures++;else airborne++;
+  }
+  assert(airborne>0&&departures>0);
 });

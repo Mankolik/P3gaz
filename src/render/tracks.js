@@ -270,7 +270,7 @@ function normalizeVerticalAssignment(track, preserveFlag=false){
     : assignment.comparator === 'or-less'
       ? 'or-less'
       : 'exact';
-  const value = Math.round(Math.max(Math.min(rawValue, 6000), -6000));
+  const value = Math.round(rawValue);
   const normalized = { value, comparator };
   track.assignedVertical = normalized;
   track.verticalRateAssigned = true;
@@ -1244,7 +1244,7 @@ function openVerticalPicker(node, anchor){
         const parsed = parseInt(raw, 10);
         if(!Number.isFinite(parsed)) return false;
         const quantized = Math.round(parsed / 100) * 100;
-        selectedValue = Math.max(Math.min(quantized, 6000), -6000);
+        selectedValue = quantized;
         track.assignedVertical = { value: selectedValue, comparator };
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);

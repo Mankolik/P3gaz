@@ -1,6 +1,7 @@
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
 import { navigationTarget, navigationHeading, passedNavigationPoint, completeNavigationPoint } from './routes.js';
 import { aircraftPerformance, aircraftCeiling, performanceSchedule } from './performance.js';
+import { requestedVerticalRate, PERFORMANCE_RATE_CHANGE_FPM_PER_SECOND } from './vertical-rate.js';
 
 const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
 const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
@@ -240,8 +241,7 @@ function normalizeVerticalAssignment(raw){
     : raw.comparator === 'or-less'
       ? 'or-less'
       : 'exact';
-  const clamped = clamp(Math.round(value), -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM);
-  return { value: clamped, comparator };
+  return { value: Math.round(value), comparator };
 }
 
 function determineTargetFlightLevel(track){
@@ -267,6 +267,7 @@ function updateVerticalState(track, dtSeconds, performance){
   }
 
   const ceiling=aircraftCeiling(track);
+  const rateChange=performance?PERFORMANCE_RATE_CHANGE_FPM_PER_SECOND:VERTICAL_RATE_CHANGE_PER_SECOND;
   let currentLevel = Number(track.actualFlightLevel);
   if(!Number.isFinite(currentLevel)){
     const fallback = determineTargetFlightLevel(track);
@@ -281,7 +282,7 @@ function updateVerticalState(track, dtSeconds, performance){
   const targetLevel = requestedLevel==null?null:clamp(requestedLevel,MIN_FLIGHT_LEVEL,ceiling);
   if(targetLevel==null){
     const currentRate = Number(track.verticalSpeed) || 0;
-    const rateDelta = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
+    const rateDelta = rateChange * dtSeconds;
     track.verticalSpeed = approachValue(currentRate, 0, rateDelta);
     return;
   }
@@ -296,31 +297,28 @@ function updateVerticalState(track, dtSeconds, performance){
   const assignment = track.verticalRateAssigned ? normalizeVerticalAssignment(track.assignedVertical) : null;
   const direction = diff > 0 ? 1 : -1;
   let desiredRate = 0;
-  if(assignment){
+  if(performance){
+    desiredRate=requestedVerticalRate(performance.rateFpm,direction,assignment);
+  }else if(assignment){
     const magnitude = Math.abs(assignment.value);
     if(magnitude === 0){
       desiredRate = 0;
     }else if(assignment.comparator === 'or-greater'){
-      desiredRate = direction * Math.max(magnitude, performance?.rateFpm ?? Math.abs(Number(track.verticalSpeed) || 0));
+      desiredRate = direction * Math.max(magnitude, Math.abs(Number(track.verticalSpeed) || 0));
     }else if(assignment.comparator === 'or-less'){
-      desiredRate = direction * Math.min(magnitude, performance?.rateFpm ?? Math.abs(Number(track.verticalSpeed) || magnitude));
+      desiredRate = direction * Math.min(magnitude, Math.abs(Number(track.verticalSpeed) || magnitude));
     }else{
       desiredRate = direction * magnitude;
     }
   }else{
-    desiredRate = direction * (performance?.rateFpm ?? computeDefaultVerticalRate(Math.abs(diff)));
+    desiredRate = direction * computeDefaultVerticalRate(Math.abs(diff));
   }
 
-  // Phase rates also bound controller requests; an assignment cannot create
-  // climb/descent performance above the supplied type's current capability.
-  const rateLimit=performance?.rateFpm ?? MAX_VERTICAL_RATE_FPM;
-  desiredRate=clamp(desiredRate,-rateLimit,rateLimit);
-
   const currentRate = Number(track.verticalSpeed) || 0;
-  const maxChange = VERTICAL_RATE_CHANGE_PER_SECOND * dtSeconds;
+  const maxChange = rateChange * dtSeconds;
   const nextRate = approachValue(currentRate, desiredRate, maxChange);
-  const clampedRate = clamp(nextRate, -rateLimit, rateLimit);
-  track.verticalSpeed = Math.abs(clampedRate) < 1 ? 0 : clampedRate;
+  // Limit the target, never snap actual rate to a newly reduced phase limit.
+  track.verticalSpeed = nextRate;
 
   const deltaFlightLevel = (track.verticalSpeed * dtSeconds) / (SECONDS_PER_MINUTE * FEET_PER_FLIGHT_LEVEL);
   let nextLevel = currentLevel + deltaFlightLevel;

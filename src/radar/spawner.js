@@ -5,23 +5,8 @@ import { aircraftPerformance } from './performance.js';
 import { convertIasToTas, convertMachToTas } from '../utils/speed.js';
 import { requestedCruiseLevel } from './cruise-level.js';
 
-// Existing initial altitude pools stay unchanged. Requested ECL has its own
-// distance-based, extended directional pools in cruise-level.js.
-export const FLIGHT_LEVELS={east:[290,310,330,350,370,390,410,450],west:[280,300,320,340,360,380,400,430]};
 const draw=random=>Math.max(0,Math.min(1-Number.EPSILON,random()));
 const choose=(items,random)=>items[Math.floor(draw(random)*items.length)];
-
-export function flightLevelWeights(heading) {
-  const east=((heading%360)+360)%360<180,peak=east?350:340;
-  return FLIGHT_LEVELS[east?'east':'west'].map(level=>({level,weight:level===peak?2:Math.abs(level-peak)===20?1.5:1}));
-}
-export function selectFlightLevel(heading, random=Math.random, ceilingFL=600) {
-  const choices=flightLevelWeights(heading).filter(item=>item.level<=ceilingFL);
-  if(!choices.length)throw new Error('No directional cruise level below the aircraft ceiling.');
-  let roll=draw(random)*choices.reduce((n,item)=>n+item.weight,0);
-  for(const item of choices) {roll-=item.weight;if(roll<0)return item.level;}
-  return choices.at(-1).level;
-}
 
 export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
   if(!catalogue.groups.length) throw new Error('No routes are ready to spawn.');
@@ -41,17 +26,17 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const operator=callsign.slice(0,3),aircraftType=choose(group.aircraftTypesByOperator[operator],random);
     const position=variant.waypoints[variant.spawnIndex],next=variant.waypoints[variant.spawnIndex+1];
     const performance=aircraftPerformance(aircraftType);
-    const heading=bearingToPoint(position,next),level=selectFlightLevel(heading,random,performance.ceilingFL);
-    // Preserve the existing initial altitude draw. ECL uses cached airport geometry
-    // independently of the active leg, route variant and source level fields.
+    const heading=bearingToPoint(position,next);
+    // One cruise draw supplies ECL and airborne spawn altitude. Departures
+    // retain FL010 and wait for a higher clearance.
     const cruiseLevel=requestedCruiseLevel(group,performance,random);
     let id;
     do {id=`spawn-${++sequence}`;} while(state.air.tracks.some(t=>t.id===id));
     const ground=variant.groundStart;
     const track=createTrack({id,callsign,status:'accepted',lon:position.lon,lat:position.lat,heading,
-      groundSpeed:ground?convertIasToTas(180,1000):convertMachToTas(performance.cruise.mach,level*100),
-      verticalSpeed:0,actualFlightLevel:ground?10:level,
-      clearedFlightLevel:ground?10:level,plannedEntryLevel:level,exitFlightLevel:null,expectedCruiseLevel:cruiseLevel,
+      groundSpeed:ground?convertIasToTas(180,1000):convertMachToTas(performance.cruise.mach,cruiseLevel*100),
+      verticalSpeed:0,actualFlightLevel:ground?10:cruiseLevel,
+      clearedFlightLevel:ground?10:cruiseLevel,plannedEntryLevel:cruiseLevel,exitFlightLevel:null,expectedCruiseLevel:cruiseLevel,
       aircraftType,wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(aircraftType)?'H':'M',
       destination:group.destination,flightPlan:{waypoints:variant.waypoints,nextIndex:variant.spawnIndex+1},
       // Airport departures start airborne, ready to follow their route.
