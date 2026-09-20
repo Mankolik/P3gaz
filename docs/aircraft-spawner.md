@@ -8,12 +8,7 @@ Routes and callsigns come from `assets/sources/Airporty_revamped.txt`. Choose an
 
 `assets/sources/route-aircraft-types.txt` contains the user's aircraft list for all 184 directional pairs and 290 route/operator combinations. Directions are independent: for example, TAY is supplied only on EPWA–LFPG and CAI only on EYVI–LTAI. Missing or invalid pools prevent startup with an explanation; no reverse-route, source-type or B738 fallback is used. Wake category follows the selected type, including heavy widebodies. `track.sourceRoute.operator` and `aircraftTypeSource` record the selection's provenance.
 
-Airborne flights start at the type's cruise Mach, converted to TAS at the sampled altitude, with AFL = CFL = that level. The initial bearing to the next resolved point determines direction: 000 through just below 180 degrees is eastbound; 180 through just below 360 is westbound.
-
-- East: 290, 310, 330, 350, 370, 390, 410, 450.
-- West: 280, 300, 320, 340, 360, 380, 400, 430.
-
-These are the supplied pools with the subsequent FL430/FL450 correction. Levels above the selected type's ceiling are removed before sampling, retaining direction and relative weights. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not override this initial selection. Source variant aircraft types are likewise ignored when spawning.
+Arrivals and overflights spawn at the calculated ECL: AFL = CFL = PEL = ECL. There is one distance-based cruise-level draw; the earlier weighted altitude sampler is removed. Initial speed is the type's cruise Mach converted to TAS at this same altitude. Departures retain AFL/CFL 010 and a separately calculated ECL/PEL. All new aircraft start with empty XFL. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not control spawn altitude. Source variant aircraft types are likewise ignored when spawning.
 
 ## Requested cruise level (ECL)
 
@@ -37,7 +32,7 @@ At catalogue compilation, `route-metrics.js` resolves the departure and destinat
 
 Where performance is supplied, the ceiling and optional `maxCruiseFL` limit the eligible levels before snapping, so clamping cannot produce an invalid east/west level. A restrictive aircraft limit can place ECL below the distance band. The present profiles provide `ceilingFL`.
 
-Only `expectedCruiseLevel` (the label's existing ECL field) receives this generated level. The initial AFL/CFL/PEL retain their existing spawn selection described above, including its initial-leg direction and weighting. Departures still have AFL/CFL 010. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. It does not fill XFL or issue a climb clearance.
+The generated level supplies `expectedCruiseLevel` (the ECL label field), PEL, and initial AFL/CFL for arrivals and overflights. Departures still have AFL/CFL 010. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. Editing ECL later does not fill XFL or issue a climb clearance.
 
 An empty XFL appears as a blank, always-visible box using the label controls' 1px `currentColor` outline. Filling XFL removes the persistent outline and restores normal behavior: matching CFL values hide until hovering/focusing the levels, and different values stay visible. Clearing XFL restores the empty box. Column geometry stays fixed, and ECL edits leave XFL intact.
 
@@ -74,7 +69,9 @@ The user-supplied `assets/sources/aircraft-performance.txt` defines all 23 avail
 
 Lower level-offs retain the relevant climb or descent/approach speed; they do not automatically climb through a clearance. Speeds use the simulator's existing altitude-aware IAS/TAS and Mach/TAS conversions and 5 kt/s acceleration model. The supplied cruise TAS and Mach are not always equivalent, so Mach drives automatic cruise while nominal TAS remains reference data. Manual IAS or Mach instructions take priority; **Clear** restores the automatic schedule without writing an assigned speed into the label.
 
-RoC/RoD are phase defaults and capability limits for vertical-rate requests. Smaller assigned rates are honoured; requests above capability are limited to the current phase's rate. Rate changes retain the existing 1,500 ft/min per second response, and level capture prevents overshoot. Movement uses at most 0.5-second integration steps for profiled types, including heading-only flights, so accelerated time does not skip altitude bands. Spawn levels, level-picker presets, manual level entry and physical movement respect the aircraft ceiling.
+RoC/RoD are phase **baselines**. Without a rate command, the aircraft aims for that baseline. Explicit climb requests can reach 110% of the current baseline; lower requests are honoured. For example, a 1,000 ft/min request against an 800 ft/min climb baseline targets 880 ft/min. Descent requests can be higher or lower without a performance-table cap. Manual rate entry and label normalization do not silently clip values at the former 4,000/6,000 ft/min limits; the preset list remains a convenience. “Or greater” and “or less” compare the requested magnitude with the baseline, then apply the climb allowance if climbing. Clearing a rate command restores the baseline.
+
+Actual vertical rate approaches its target at **50 ft/min per second** for profiled aircraft: a 1,000 ft/min change takes 20 seconds. This applies both to phase changes (such as FL050) and controller requests. A lower phase baseline changes the target, without instantly clipping the current rate; the aircraft gradually settles onto the new baseline/allowance. The response also works at normal high-frame-rate tick sizes. Level capture still prevents crossing a cleared level. Movement uses at most 0.5-second integration steps for profiled types, including heading-only flights, so accelerated time does not skip altitude bands. Spawn levels, level-picker presets, manual level entry and physical movement respect the aircraft ceiling.
 
 Range and minimum clean speed (MCS) are retained as reference fields. There is no fuel/range or flap-configuration model; MCS is not applied as a blanket speed floor because the supplied initial-climb and approach speeds can be below it. Unknown ad hoc types retain generic movement, while the route spawner requires a profile for every configured type.
 
@@ -104,4 +101,4 @@ node tests/spawner.browser.cjs
 node tests/track-labels.browser.cjs
 ```
 
-Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, every supplied operator/type choice, directional pool differences, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, weighted levels, moving FL010 departures, duplicate prevention, startup failures (including unavailable aircraft pools), real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.
+Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, every supplied operator/type choice, directional pool differences, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, airborne spawning at ECL, moving FL010 departures, gradual rate changes at phase boundaries and high frame rates, 110% climb requests, uncapped descent requests through the picker, duplicate prevention, startup failures, real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.

@@ -182,6 +182,30 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     assert.deepEqual(await page.evaluate(()=>window.labelTest.tracks[0].labelOffset), {x:98,y:10});
     console.log('PASS: speed/type toggles, heading/speed/rate/ECL pickers, outside dismissal, and label dragging');
 
+    // Exercise rate commands through the real picker and movement together.
+    const performancePage=await browser.newPage({viewport:{width:1100,height:700}});
+    await performancePage.goto(origin+'/fixture');await performancePage.waitForFunction(()=>window.labelTest?.tracks.length);
+    const performanceLabel=performancePage.locator('.track-label').first();
+    await performancePage.evaluate(()=>{
+      Object.assign(window.labelTest.tracks[0],{aircraftType:'A21N',actualFlightLevel:300,clearedFlightLevel:380,
+        verticalSpeed:1000,assignedVertical:null,verticalRateAssigned:false});window.labelTest.render();
+    });
+    await performanceLabel.hover();await performanceLabel.locator('.assigned-vertical').click();
+    await performancePage.locator('.track-picker input').fill('2000');await performancePage.keyboard.press('Enter');
+    await performancePage.evaluate(()=>{window.labelTest.advance(2);window.labelTest.render();});
+    assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].verticalSpeed),1100);
+    await performancePage.evaluate(()=>{
+      Object.assign(window.labelTest.tracks[0],{aircraftType:'B77W',actualFlightLevel:400,clearedFlightLevel:100,
+        verticalSpeed:-1000,assignedVertical:null,verticalRateAssigned:false});window.labelTest.render();
+    });
+    await performanceLabel.locator('.assigned-vertical').click();
+    await performancePage.locator('.track-picker input').fill('-7000');await performancePage.keyboard.press('Enter');
+    assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].assignedVertical.value),-7000);
+    await performancePage.evaluate(()=>{window.labelTest.advance(120);window.labelTest.render();});
+    assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].verticalSpeed),-7000);
+    await performancePage.close();
+    console.log('PASS: UI rate commands allow 110% climb and uncapped manual descent');
+
     // Open around the assignment, including manual values between presets.
     for(const [selector, assignments, nearest, exact] of [
       ['.assigned-heading', {assignedHeading:180}, 180, true],
