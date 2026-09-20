@@ -368,6 +368,8 @@ function updateLevelSegments(node, track, items){
   const exitItem = items.find(item=>item.label === 'XFL');
   const exitValue = exitItem?.value ?? track?.exitFlightLevel ?? null;
   applyLevelSegment(segments.exit, 'XFL', exitValue, 'exitFlightLevel', true);
+  segments.exit.segment.classList.toggle('is-empty-exit',exitValue==null);
+  if(exitValue==null)segments.exit.value.textContent='\u00a0';
 
   // Keep every field in the same column, even when a repeated value is hidden.
   let previousValue = null;
@@ -768,6 +770,7 @@ function updateLabelNode(node, track){
 
   const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
+  node.ecl.title = track.expectedCruiseLevel!=null ? `ECL FL${formatFlightLevel(track.expectedCruiseLevel)}` : 'ECL';
   node.ecl.dataset.empty = eclValue === '--';
   node.needsMeasure = true;
 

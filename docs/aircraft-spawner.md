@@ -2,7 +2,7 @@
 
 Use **+ Aircraft** at the top right. Each click creates one **accepted** track. The button waits for the navigation data and route catalogue; a load failure leaves it disabled with an explanation. A short message identifies the flight and its spawn fix or ground state.
 
-## Selection and levels
+## Selection and initial levels
 
 Routes and callsigns come from `assets/sources/Airporty_revamped.txt`. Choose an eligible departure/destination pair uniformly, then an unused callsign from that pair, then a valid route variant, then an aircraft type uniformly from that directional pair's operator pool. The operator is the callsign's first three letters. Pairs with more variants or more aircraft types do not get more traffic. Active callsigns and track IDs are unique. All callsigns exhausted produces a message and no new track.
 
@@ -14,6 +14,32 @@ Airborne flights start at the type's cruise Mach, converted to TAS at the sample
 - West: 280, 300, 320, 340, 360, 380, 400, 430.
 
 These are the supplied pools with the subsequent FL430/FL450 correction. Levels above the selected type's ceiling are removed before sampling, retaining direction and relative weights. FL350 east / FL340 west has weight 2, the adjacent levels have weight 1.5, and the remaining levels have weight 1. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not override this initial selection. Source variant aircraft types are likewise ignored when spawning.
+
+## Requested cruise level (ECL)
+
+At catalogue compilation, `route-metrics.js` resolves the departure and destination airport coordinates and caches `routeDistanceKm` and `generalTrack` on each group. Distance is the great-circle airport-to-airport distance (mean Earth radius 6371.0088 km); general track is its initial bearing. Each directional airport pair is measured once per compilation, regardless of route-variant count. Spawning reuses these fields; movement ticks never calculate route distance. Route detours, truncated foreign prefixes/suffixes and original route-file type/FL annotations do not influence ECL.
+
+| Airport distance (km) | ECL target band |
+| --- | --- |
+| Below 250 | FL180–240 |
+| 250 to below 450 | FL220–280 |
+| 450 to below 700 | FL260–320 |
+| 700 to below 1000 | FL280–340 |
+| 1000 to below 1500 | FL300–360 |
+| 1500 to below 2200 | FL320–380 |
+| 2200 through 3500 | FL340–400 |
+| Above 3500 | FL350–410 |
+
+`cruise-level.js` samples a target around the band's midpoint with uniform variation of at most ±FL020, then snaps to the nearest valid general-track level (ties go lower):
+
+- 000° to below 180°: 190, 210, 230, 250, 270, 290, 310, 330, 350, 370, 390, 410, 450.
+- 180° to below 360°: 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 430.
+
+Where performance is supplied, the ceiling and optional `maxCruiseFL` limit the eligible levels before snapping, so clamping cannot produce an invalid east/west level. A restrictive aircraft limit can place ECL below the distance band. The present profiles provide `ceilingFL`.
+
+Only `expectedCruiseLevel` (the label's existing ECL field) receives this generated level. The initial AFL/CFL/PEL retain their existing spawn selection described above, including its initial-leg direction and weighting. Departures still have AFL/CFL 010. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. It does not fill XFL or issue a climb clearance.
+
+An empty XFL appears as a blank, always-visible box using the label controls' 1px `currentColor` outline. Filling XFL removes the persistent outline and restores normal behavior: matching CFL values hide until hovering/focusing the levels, and different values stay visible. Clearing XFL restores the empty box. Column geometry stays fixed, and ECL edits leave XFL intact.
 
 ## Entry and route following
 
@@ -29,7 +55,7 @@ Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N0203
 
 ## Ground departures
 
-Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. The sampled level is retained as the future cruise target; the aircraft holds its current cleared level until the controller clears it higher. This is a generic departure, without taxi, runway roll or a published SID.
+Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. The distance-based requested level is shown as ECL; the aircraft holds its current cleared level until the controller clears it higher. This is a generic departure, without taxi, runway roll or a published SID.
 
 ## Aircraft performance
 
