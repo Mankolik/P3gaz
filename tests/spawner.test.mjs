@@ -13,6 +13,8 @@ import {loadAircraftSpawner} from '../src/data/loader.js';
 import {parseRouteAircraft,applyRouteAircraft} from '../src/radar/route-aircraft.js';
 import {aircraftPerformance} from '../src/radar/performance.js';
 import {convertIasToTas,convertMachToTas} from '../src/utils/speed.js';
+import {greatCircleDistanceKm} from '../src/radar/route-metrics.js';
+import {requestedCruiseLevel} from '../src/radar/cruise-level.js';
 
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const json=p=>JSON.parse(read(p));
@@ -218,7 +220,7 @@ test('directional pools, wraparound headings and mild FL340/350 weighting',()=>{
 
 test('selection draws pair then callsign then variant then operator type independently',()=>{
   const g=only('KJFK','EPWA').groups[0],other=only('EPWA','EPKK').groups[0];
-  const rolls=[0.75,0.75,0.9,0,0],s=state();
+  const rolls=[0.75,0.75,0.9,0,0,0.5],s=state();
   const spawner=createAircraftSpawner({groups:[g,{...other,callsigns:['LOT1','LOT2']}]},{random:()=>rolls.shift()});
   const t=spawner.spawn(s);
   assert.equal(t.departure,'EPWA');assert.equal(t.callsign,'LOT2');assert.equal(t.aircraftType,'E170');
@@ -237,7 +239,8 @@ test('heading follows the onward spawn leg and metadata preserves original route
   const s=state(),g=only('EPWA','EPKK').groups[0];
   const t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(s);
   assert(Math.abs(t.heading-bearingToPoint(t,navigationTarget(t)))<1e-9);
-  assert.equal(t.sourceRoute.sourceFlightLevel,220);assert.equal(t.expectedCruiseLevel,280);
+  assert.equal(t.sourceRoute.sourceFlightLevel,220);assert.equal(t.exitFlightLevel,280);
+  assert.equal(t.expectedCruiseLevel,180);assert.equal(t.boxExitLevel,true);
 });
 
 test('startup loads the source catalogue and fails clearly if navigation or routes are unavailable',async t=>{
@@ -266,7 +269,7 @@ test('every supplied aircraft type can spawn for its operator regardless of rout
     const callsign=g.callsigns.find(c=>c.startsWith(operator));
     for(const [index,type] of types.entries()){
       const variant={...g.variants[0],aircraftType:'ZZZZ',sourceFlightLevel:999};
-      const rolls=[0,0,0,(index+0.5)/types.length,0];
+      const rolls=[0,0,0,(index+0.5)/types.length,0,0.5];
       const t=createAircraftSpawner({groups:[{...g,callsigns:[callsign],variants:[variant]}]},{random:()=>rolls.shift()}).spawn(state());
       assert.equal(t.aircraftType,type,`${g.departure}-${g.destination} / ${operator}`);
       assert.equal(t.sourceRoute.operator,operator);
@@ -287,4 +290,47 @@ test('invalid or missing aircraft pools fail without defaulting to source types'
   assert.throws(()=>createAircraftSpawner({groups:[{...g,aircraftTypesByOperator:{}}]}),/aircraft pool/);
   t.mock.method(globalThis,'fetch',async url=>({ok:!String(url).endsWith('route-aircraft-types.txt'),text:async()=>read('assets/sources/Airporty_revamped.txt')}));
   await assert.rejects(()=>loadAircraftSpawner(resolver,firData),/Failed to load the route aircraft pools/);
+});
+
+test('compilation measures each directional airport pair once; all later spawns and ticks reuse it',()=>{
+  let calculations=0;
+  const compiled=applyRouteAircraft(compileRouteCatalogue(groups,resolver,fir,{measureDistance:(a,b)=>{
+    calculations++;return greatCircleDistanceKm(a,b);
+  }}),pools);
+  assert.equal(calculations,184);
+  for(const g of compiled.groups){
+    assert(g.routeDistanceKm>0);assert(g.generalTrack>=0&&g.generalTrack<360);
+    for(const v of g.variants){
+      const s=state();createAircraftSpawner({groups:[{...g,variants:[v]}]},{random:()=>0.5}).spawn(s);
+      updateTrackMovement(s,3);
+    }
+  }
+  assert.equal(calculations,184);
+  const warsawKrakow=compiled.groups.find(g=>g.departure==='EPWA'&&g.destination==='EPKK');
+  assert(warsawKrakow.routeDistanceKm>240&&warsawKrakow.routeDistanceKm<250);
+});
+
+test('legacy aircraft/level annotations do not influence ECL, type or unchanged initial XFL',()=>{
+  const g=only('EPWA','EPKK').groups[0];
+  const mutated={...g,variants:g.variants.map(v=>({...v,aircraftType:'B77W',sourceFlightLevel:450,annotations:['N0500F450']}))};
+  const a=createAircraftSpawner({groups:[g]},{random:()=>0.5}).spawn(state());
+  const b=createAircraftSpawner({groups:[mutated]},{random:()=>0.5}).spawn(state());
+  for(const key of ['aircraftType','actualFlightLevel','clearedFlightLevel','exitFlightLevel','expectedCruiseLevel'])assert.equal(a[key],b[key]);
+  assert.equal(a.expectedCruiseLevel,requestedCruiseLevel(g,aircraftPerformance(a.aircraftType),()=>0.5));
+  assert.equal(a.exitFlightLevel,selectFlightLevel(a.heading,()=>0.5,aircraftPerformance(a.aircraftType).ceilingFL));
+  assert.notEqual(a.expectedCruiseLevel,a.exitFlightLevel);
+  assert.equal(a.boxExitLevel,true);
+});
+
+test('ECL uses airport general track and changes independently of initial XFL and spawn altitude',()=>{
+  const g=only('EPWA','EPKK').groups[0];
+  const spawn=(generalTrack,lastRoll)=>{
+    const rolls=[0,0,0,0,0,lastRoll];
+    return createAircraftSpawner({groups:[{...g,generalTrack}]},{random:()=>rolls.shift()}).spawn(state());
+  };
+  const west=spawn(270,0.5),east=spawn(90,0.5),higher=spawn(90,1);
+  assert.equal(west.expectedCruiseLevel,200);assert.equal(east.expectedCruiseLevel,210);assert.equal(higher.expectedCruiseLevel,230);
+  for(const t of [west,east,higher]){
+    assert.equal(t.exitFlightLevel,280);assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);
+  }
 });

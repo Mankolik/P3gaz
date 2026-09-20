@@ -1,5 +1,6 @@
 import { validPoint } from './routes.js';
 import { findSpawnIndex } from './fir-boundary.js';
+import { cacheRouteMetrics } from './route-metrics.js';
 
 const AIRWAY=/^(?:U)?[A-Z]\d{1,4}$/;
 const SPEED_LEVEL=/^(?:N\d{4}|K\d{4}|M\d{3})(?:F\d{3}|A\d{3}|S\d{4}|M\d{4})$/;
@@ -63,7 +64,7 @@ function coordinatePoint(name) {
   return point;
 }
 
-export function compileRouteCatalogue(groups, resolver, boundary) {
+export function compileRouteCatalogue(groups, resolver, boundary, metricsOptions) {
   if(!resolver || !boundary) throw new Error('Navigation and EPWW data are required.');
   const diagnostics=[], compiled=[];
   for(const group of groups) {
@@ -147,6 +148,6 @@ export function compileRouteCatalogue(groups, resolver, boundary) {
     }
     if(variants.length) compiled.push({...group,variants});
   }
-  return {groups:compiled,diagnostics,totalGroups:groups.length,totalVariants:groups.reduce((n,g)=>n+g.variants.length,0),
+  return {groups:cacheRouteMetrics(compiled,name=>resolver.resolvePoint(name),metricsOptions),diagnostics,totalGroups:groups.length,totalVariants:groups.reduce((n,g)=>n+g.variants.length,0),
     validVariants:compiled.reduce((n,g)=>n+g.variants.length,0)};
 }
