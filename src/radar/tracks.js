@@ -37,7 +37,6 @@ export function createTrack(data, project, index=0, airwayResolver=null){
     clearedFlightLevel: data.clearedFlightLevel,
     plannedEntryLevel: data.plannedEntryLevel,
     exitFlightLevel: data.exitFlightLevel,
-    boxExitLevel: !!data.boxExitLevel,
     levelMode: data.levelMode || 'cfl',
     aircraftType: data.aircraftType,
     squawk: data.squawk,

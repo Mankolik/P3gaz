@@ -5,7 +5,7 @@ import { aircraftPerformance } from './performance.js';
 import { convertIasToTas, convertMachToTas } from '../utils/speed.js';
 import { requestedCruiseLevel } from './cruise-level.js';
 
-// Existing initial/XFL pools stay unchanged. Requested ECL has its own
+// Existing initial altitude pools stay unchanged. Requested ECL has its own
 // distance-based, extended directional pools in cruise-level.js.
 export const FLIGHT_LEVELS={east:[290,310,330,350,370,390,410,450],west:[280,300,320,340,360,380,400,430]};
 const draw=random=>Math.max(0,Math.min(1-Number.EPSILON,random()));
@@ -42,7 +42,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const position=variant.waypoints[variant.spawnIndex],next=variant.waypoints[variant.spawnIndex+1];
     const performance=aircraftPerformance(aircraftType);
     const heading=bearingToPoint(position,next),level=selectFlightLevel(heading,random,performance.ceilingFL);
-    // Preserve the existing initial/XFL draw. ECL uses cached airport geometry
+    // Preserve the existing initial altitude draw. ECL uses cached airport geometry
     // independently of the active leg, route variant and source level fields.
     const cruiseLevel=requestedCruiseLevel(group,performance,random);
     let id;
@@ -51,8 +51,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const track=createTrack({id,callsign,status:'accepted',lon:position.lon,lat:position.lat,heading,
       groundSpeed:ground?convertIasToTas(180,1000):convertMachToTas(performance.cruise.mach,level*100),
       verticalSpeed:0,actualFlightLevel:ground?10:level,
-      clearedFlightLevel:ground?10:level,plannedEntryLevel:level,exitFlightLevel:level,expectedCruiseLevel:cruiseLevel,
-      boxExitLevel:true,
+      clearedFlightLevel:ground?10:level,plannedEntryLevel:level,exitFlightLevel:null,expectedCruiseLevel:cruiseLevel,
       aircraftType,wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(aircraftType)?'H':'M',
       destination:group.destination,flightPlan:{waypoints:variant.waypoints,nextIndex:variant.spawnIndex+1},
       // Airport departures start airborne, ready to follow their route.

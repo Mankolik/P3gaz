@@ -37,9 +37,9 @@ At catalogue compilation, `route-metrics.js` resolves the departure and destinat
 
 Where performance is supplied, the ceiling and optional `maxCruiseFL` limit the eligible levels before snapping, so clamping cannot produce an invalid east/west level. A restrictive aircraft limit can place ECL below the distance band. The present profiles provide `ceilingFL`.
 
-Only `expectedCruiseLevel` (the label's existing ECL field) receives this generated level. The initial AFL/CFL/PEL and **XFL retain their existing spawn selection** described above, including its initial-leg direction and weighting. Departures still have AFL/CFL 010. ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. It does not replace the three-digit XFL or issue a climb clearance.
+Only `expectedCruiseLevel` (the label's existing ECL field) receives this generated level. The initial AFL/CFL/PEL retain their existing spawn selection described above, including its initial-leg direction and weighting. Departures still have AFL/CFL 010. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. It does not fill XFL or issue a climb clearance.
 
-New spawned aircraft set `boxExitLevel`; their XFL uses the same 1px `currentColor` outline as other label controls. The box does not change column geometry and stays visible even when XFL duplicates CFL. ECL edits leave XFL intact. Existing demo-label duplicate hiding is unchanged.
+An empty XFL appears as a blank, always-visible box using the label controls' 1px `currentColor` outline. Filling XFL removes the persistent outline and restores normal behavior: matching CFL values hide until hovering/focusing the levels, and different values stay visible. Clearing XFL restores the empty box. Column geometry stays fixed, and ECL edits leave XFL intact.
 
 ## Entry and route following
 

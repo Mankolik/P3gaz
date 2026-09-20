@@ -368,7 +368,8 @@ function updateLevelSegments(node, track, items){
   const exitItem = items.find(item=>item.label === 'XFL');
   const exitValue = exitItem?.value ?? track?.exitFlightLevel ?? null;
   applyLevelSegment(segments.exit, 'XFL', exitValue, 'exitFlightLevel', true);
-  segments.exit.segment.classList.toggle('is-boxed',!!track.boxExitLevel);
+  segments.exit.segment.classList.toggle('is-empty-exit',exitValue==null);
+  if(exitValue==null)segments.exit.value.textContent='\u00a0';
 
   // Keep every field in the same column, even when a repeated value is hidden.
   let previousValue = null;

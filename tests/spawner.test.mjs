@@ -239,8 +239,8 @@ test('heading follows the onward spawn leg and metadata preserves original route
   const s=state(),g=only('EPWA','EPKK').groups[0];
   const t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(s);
   assert(Math.abs(t.heading-bearingToPoint(t,navigationTarget(t)))<1e-9);
-  assert.equal(t.sourceRoute.sourceFlightLevel,220);assert.equal(t.exitFlightLevel,280);
-  assert.equal(t.expectedCruiseLevel,180);assert.equal(t.boxExitLevel,true);
+  assert.equal(t.sourceRoute.sourceFlightLevel,220);assert.equal(t.exitFlightLevel,null);
+  assert.equal(t.expectedCruiseLevel,180);
 });
 
 test('startup loads the source catalogue and fails clearly if navigation or routes are unavailable',async t=>{
@@ -310,16 +310,15 @@ test('compilation measures each directional airport pair once; all later spawns 
   assert(warsawKrakow.routeDistanceKm>240&&warsawKrakow.routeDistanceKm<250);
 });
 
-test('legacy aircraft/level annotations do not influence ECL, type or unchanged initial XFL',()=>{
+test('legacy aircraft/level annotations do not influence ECL, type or empty initial XFL',()=>{
   const g=only('EPWA','EPKK').groups[0];
   const mutated={...g,variants:g.variants.map(v=>({...v,aircraftType:'B77W',sourceFlightLevel:450,annotations:['N0500F450']}))};
   const a=createAircraftSpawner({groups:[g]},{random:()=>0.5}).spawn(state());
   const b=createAircraftSpawner({groups:[mutated]},{random:()=>0.5}).spawn(state());
   for(const key of ['aircraftType','actualFlightLevel','clearedFlightLevel','exitFlightLevel','expectedCruiseLevel'])assert.equal(a[key],b[key]);
   assert.equal(a.expectedCruiseLevel,requestedCruiseLevel(g,aircraftPerformance(a.aircraftType),()=>0.5));
-  assert.equal(a.exitFlightLevel,selectFlightLevel(a.heading,()=>0.5,aircraftPerformance(a.aircraftType).ceilingFL));
+  assert.equal(a.exitFlightLevel,null);
   assert.notEqual(a.expectedCruiseLevel,a.exitFlightLevel);
-  assert.equal(a.boxExitLevel,true);
 });
 
 test('ECL uses airport general track and changes independently of initial XFL and spawn altitude',()=>{
@@ -331,6 +330,6 @@ test('ECL uses airport general track and changes independently of initial XFL an
   const west=spawn(270,0.5),east=spawn(90,0.5),higher=spawn(90,1);
   assert.equal(west.expectedCruiseLevel,200);assert.equal(east.expectedCruiseLevel,210);assert.equal(higher.expectedCruiseLevel,230);
   for(const t of [west,east,higher]){
-    assert.equal(t.exitFlightLevel,280);assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);
+    assert.equal(t.exitFlightLevel,null);assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);
   }
 });

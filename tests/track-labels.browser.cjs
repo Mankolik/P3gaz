@@ -114,7 +114,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       await value.click();
       assert.equal(await page.locator('.track-picker__level-label').textContent(), label);
       await page.locator('.track-picker__clear').click();
-      assert.equal(await value.textContent(), '---');
+      assert.equal((await value.textContent()).trim(), field==='exit'?'':'---');
       await value.click();
       const input = page.locator('.track-picker input');
       await input.fill('275');

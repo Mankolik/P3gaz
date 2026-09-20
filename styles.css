@@ -52,9 +52,9 @@ header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; al
 .track-label .level-segment__label{ display:none; }
 .track-label .level-segment__value{ appearance:none; box-sizing:content-box; display:inline-block; width:3ch; margin:0; padding:0 1px; border:0; border-radius:3px; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; text-align:left; }
 .track-label .level-segment.is-repeated .level-segment__value{ opacity:0; }
-/* Keep spawned XFL boxed even when it repeats CFL. Match the label's existing
-   currentColor outline without changing column widths or hover geometry. */
-.track-label .level-segment.is-boxed .level-segment__value{ opacity:1; outline:1px solid currentColor; outline-offset:1px; }
+/* Only an empty XFL has a persistent outline. Filled values retain normal
+   duplicate hiding and hover behavior without changing column geometry. */
+.track-label .level-segment.is-empty-exit .level-segment__value{ opacity:1; outline:1px solid currentColor; outline-offset:1px; }
 .track-label .levels:hover .level-segment__value,
 .track-label .levels:focus-within .level-segment__value{ opacity:1; }
 .track-label .level-segment.editable .level-segment__value{ cursor:pointer; }
