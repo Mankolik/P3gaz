@@ -2,7 +2,7 @@
 
 Each track is checked against the loaded `SECTOR_LOW`, `SECTOR_HIGH`, and `TMA` GeoJSON datasets after initial loading and after every movement update. Checks use the source longitude/latitude polygons and `actualFlightLevel`; map zoom, layer visibility, cleared levels and planned levels do not change physical membership.
 
-The callsign tooltip shows physical sector membership and vertical limits. The floating window is now **Sector sequence**, showing the last hovered aircraft's grouped current/upcoming sectors and predicted crossing levels/distances; see [trajectory](trajectory.md). It remains draggable and stays within the radar area when resized.
+The callsign tooltip shows physical sector membership and vertical limits. The floating [Extended Label Window](extended-label-window.md) shows the last hovered aircraft's details, live Mode S values and grouped sector sequence with exit levels. It remains draggable and stays within the radar area when resized.
 
 A track outside every loaded volume is shown as outside the loaded sector limits. Missing position/altitude or incomplete sector datasets produce an unavailable result rather than a guessed sector.
 

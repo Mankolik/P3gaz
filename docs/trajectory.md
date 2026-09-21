@@ -31,7 +31,7 @@ Predictions refresh immediately on approved route/PEL/XFL changes and physical s
 
 ## Transfers and labels
 
-The floating **Sector sequence** window remembers the last hovered track and shows its current and upcoming sector designators in route order. It lists predicted entry levels and distances ahead for each crossing, alongside the aircraft's actual level and control owner. It refreshes as the aircraft moves or its trajectory changes; repeated sector visits remain in order. Drag the header or use its arrow keys to move the window. Crossing markers also appear when the route is displayed/previewed.
+The floating [Extended Label Window](extended-label-window.md) remembers the last hovered track. Row 8 shows its current and upcoming sector designators and exit levels in route order, coloured by ownership and sequence position; repeated visits remain in order. The other rows show flight details and live Mode S values. Drag the header or use its arrow keys to move the window. Predicted crossing markers and levels still appear when the route is displayed/previewed.
 
 - ALLFIR next: **inbound**; ALLFIR later in the sequence: **pre-inbound**.
 - Within approximately 10 NM along the prediction before entry: automatically owned by ALLFIR and **accepted**, even while physically outside.
