@@ -3,6 +3,7 @@ import { sectorMembershipTitle } from '../radar/sectors.js';
 import { assignHeading, navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 import { aircraftCeiling } from '../radar/performance.js';
+import { assignClearedLevel, assignVerticalRate } from '../radar/clearances.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -278,8 +279,7 @@ function normalizeVerticalAssignment(track, preserveFlag=false){
 }
 
 function clearVerticalAssignment(track){
-  track.assignedVertical = null;
-  track.verticalRateAssigned = false;
+  assignVerticalRate(track, null);
 }
 
 function formatAssignedVerticalDisplay(assignment){
@@ -364,6 +364,13 @@ function updateLevelSegments(node, track, items){
   const primaryEditable = !!primaryField;
   const primaryValue = primaryItem?.value ?? track?.[primaryField] ?? null;
   applyLevelSegment(segments.primary, primaryLabel, primaryValue, primaryEditable ? primaryField : null, primaryEditable);
+  const unableCfl = primaryField === 'clearedFlightLevel' && Number.isFinite(track.unableCfl);
+  segments.primary.segment.classList.toggle('is-unable', unableCfl);
+  if(unableCfl){
+    const response = `Unable FL${formatFlightLevel(track.unableCfl)}; continuing CFL ${formatFlightLevel(primaryValue)}`;
+    segments.primary.value.title = response;
+    segments.primary.value.setAttribute('aria-label', `Edit CFL. ${response}`);
+  }
 
   const exitItem = items.find(item=>item.label === 'XFL');
   const exitValue = exitItem?.value ?? track?.exitFlightLevel ?? null;
@@ -767,6 +774,9 @@ function updateLabelNode(node, track){
   node.assignedVertical.title = track.verticalRateAssigned
     ? (verticalValue ? `${verticalValue} FPM` : 'Rate assigned')
     : '';
+  const unableRate = hasVerticalAssignment && track.unableVerticalRate === true;
+  node.assignedVertical.classList.toggle('is-unable', unableRate);
+  if(unableRate) node.assignedVertical.title = `Unable ${verticalValue} FPM; maximum climb rate is 110% of baseline`;
 
   const eclValue = track.expectedCruiseLevel!=null ? formatExpectedLevel(track.expectedCruiseLevel) : '--';
   node.ecl.textContent = eclValue;
@@ -1196,7 +1206,7 @@ function openVerticalPicker(node, anchor){
       comparator = comparator === next ? 'exact' : next;
       updateComparatorButtons();
       if(selectedValue!=null){
-        track.assignedVertical = { value: selectedValue, comparator };
+        assignVerticalRate(track, { value: selectedValue, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1225,7 +1235,7 @@ function openVerticalPicker(node, anchor){
         evt.preventDefault();
         evt.stopPropagation();
         selectedValue = value;
-        track.assignedVertical = { value, comparator };
+        assignVerticalRate(track, { value, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1245,7 +1255,7 @@ function openVerticalPicker(node, anchor){
         if(!Number.isFinite(parsed)) return false;
         const quantized = Math.round(parsed / 100) * 100;
         selectedValue = quantized;
-        track.assignedVertical = { value: selectedValue, comparator };
+        assignVerticalRate(track, { value: selectedValue, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1281,6 +1291,8 @@ function openEclPicker(node, anchor){
 
 function createLevelEditor(field, track, node, close, options){
   const ceiling=Math.min(LEVEL_MAX,aircraftCeiling(track));
+  const isCfl = field.key === 'clearedFlightLevel';
+  const maxLevel = isCfl ? LEVEL_MAX : ceiling;
   const row = document.createElement('div');
   row.className = 'track-picker__level';
   const header = document.createElement('div');
@@ -1302,7 +1314,7 @@ function createLevelEditor(field, track, node, close, options){
   input.type = 'number';
   input.step = String(LEVEL_STEP);
   input.min = String(LEVEL_MIN);
-  input.max = String(ceiling);
+  input.max = String(maxLevel);
   input.placeholder = 'Manual level';
   input.title = `Press Enter to apply (ceiling FL${ceiling})`;
   manual.appendChild(input);
@@ -1327,9 +1339,10 @@ function createLevelEditor(field, track, node, close, options){
   const applyValue = raw=>{
     const trimmed = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim();
     if(!trimmed){
-      const hadValue = track[field.key]!=null;
+      const hadValue = track[field.key]!=null || (isCfl && track.unableCfl!=null);
       if(hadValue){
-        track[field.key] = null;
+        if(isCfl) assignClearedLevel(track, null);
+        else track[field.key] = null;
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
       }
@@ -1340,10 +1353,11 @@ function createLevelEditor(field, track, node, close, options){
     if(!Number.isFinite(parsed)){
       return false;
     }
-    const clamped = Math.min(clampLevelValue(parsed),ceiling);
+    const clamped = Math.min(clampLevelValue(parsed),maxLevel);
     const previous = getTrackLevelValue(track, field.key);
-    if(previous !== clamped || typeof track[field.key] !== 'number'){
-      track[field.key] = clamped;
+    if(isCfl || previous !== clamped || typeof track[field.key] !== 'number'){
+      if(isCfl) assignClearedLevel(track, clamped);
+      else track[field.key] = clamped;
       track.labelRevision = (track.labelRevision || 0) + 1;
       updateLabelNode(node, track);
     }
@@ -1351,7 +1365,7 @@ function createLevelEditor(field, track, node, close, options){
     return true;
   };
 
-  LEVEL_OPTIONS.filter(value=>value<=ceiling).forEach(value=>{
+  LEVEL_OPTIONS.filter(value=>value<=maxLevel).forEach(value=>{
     const option = createPickerOption(formatFlightLevel(value), false);
     option.dataset.value = String(value);
     option.addEventListener('click', evt=>{

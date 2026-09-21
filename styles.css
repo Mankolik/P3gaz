@@ -68,6 +68,8 @@ header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; al
 .track-label .row4 span:active{ background:rgba(255,255,255,.18); }
 .track-label .row4 .assigned-vertical{ min-width:14px; }
 .track-label .row4 .assigned-vertical[data-mode="pending"]{ color:var(--track-amber); }
+.track-label .level-segment.is-unable .level-segment__value,
+.track-label .row4 .assigned-vertical.is-unable{ color:var(--track-amber); opacity:1; }
 .track-label .muted{ color:var(--track-gray); }
 .track-label.status-accepted{ color:var(--track-green); }
 .track-label.status-accepted .callsign{ color:var(--track-green); }
