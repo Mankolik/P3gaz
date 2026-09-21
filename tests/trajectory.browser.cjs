@@ -73,13 +73,12 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   assert.equal(await label.locator('.assigned-heading.is-proposed').count(),1);
   assert.equal(await page.evaluate(()=>window.test.t.assignedHeading),null);
   await page.evaluate(()=>window.test.advance(3));assert.equal(await page.evaluate(()=>window.test.t.assignedHeading),100);
+  assert.equal(await page.locator('.sector-panel__sequence').textContent(),'EDU → ALLFIR → ESA','heading uses the drawn filed route');
   await page.evaluate(()=>{const {t}=window.test;t.lon=-0.1;t.assignedHeading=90;window.test.render();});
   assert.match(await label.getAttribute('class'),/status-accepted/);assert.equal(await label.locator('.level-primary').getAttribute('data-field'),'clearedFlightLevel');
   await page.evaluate(()=>{window.test.t.lon=0.1;window.test.render();window.test.t.lon=3.9;window.test.advance(4);});
   assert.match(await label.getAttribute('class'),/status-intruder/);
   await page.evaluate(()=>{window.test.t.lon=4.1;window.test.render();});assert.match(await label.getAttribute('class'),/status-unconcerned/);
-  assert.equal(await page.locator('.sector-panel__sequence').textContent(),'ESA → UNKNOWN');
-  await page.evaluate(()=>{window.test.t.assignedHeading=null;window.test.t.navigationMode='route';window.test.render();});
   assert.equal(await page.locator('.sector-panel__sequence').textContent(),'ESA');
   assert.match(await page.locator('.sector-panel__crossings').textContent(),/No further sector crossing/);
   await page.evaluate(()=>{window.test.t.trajectory={sequence:[],complete:false,reason:'Airspace data unavailable'};window.test.state.bus.emit('tick',0);});

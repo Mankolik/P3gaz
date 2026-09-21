@@ -1,5 +1,6 @@
 import { airspaceAt, airspaceLegCuts } from './airspace.js';
-import { remainingPlanPoints, validPoint } from './routes.js';
+import { plannedRoutePoints as trajectoryRoute } from './planned-route.js';
+export { trajectoryRoute };
 import { aircraftCeiling, performanceSchedule } from './performance.js';
 import { effectiveSpeedInstruction } from './speed-control.js';
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
@@ -10,21 +11,6 @@ export function distanceNm(a,b){
   return 3440.065*2*Math.asin(Math.sqrt(Math.min(1,h)));
 }
 const lerp=(a,b,t)=>({lon:a.lon+(b.lon-a.lon)*t,lat:a.lat+(b.lat-a.lat)*t});
-
-export function trajectoryRoute(track){
-  const remaining=remainingPlanPoints(track).filter(validPoint);
-  if(track.navigationMode==='route')return remaining;
-  if(track.navigationMode==='direct' && validPoint(track.directTo?.target)){
-    const d=track.directTo;
-    return [d.target,...(d.plan===track.flightPlan ? remaining.filter(p=>
-      Number.isInteger(d.planIndex) ? p.index>d.planIndex : Number.isInteger(d.rejoinIndex) && p.index>=d.rejoinIndex) : [])];
-  }
-  // Vectoring has no known rejoin. Project two hours along the held heading.
-  const heading=(track.assignedHeading ?? track.heldHeading ?? track.heading ?? 0)*Math.PI/180;
-  const distance=Math.max(120,track.groundSpeed || 400)*2;
-  return [{name:'VECTOR',lat:track.lat+distance*Math.cos(heading)/60,
-    lon:track.lon+distance*Math.sin(heading)/(60*Math.max(0.1,Math.cos(track.lat*Math.PI/180)))}];
-}
 
 export function sectorTargetLevel(track, sector, entryLevel, beforeControlled=true){
   const controlled=track.control?.sector || 'ALLFIR';

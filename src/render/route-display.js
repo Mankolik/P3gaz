@@ -1,22 +1,6 @@
-import { remainingPlanPoints, validPoint } from '../radar/routes.js';
-
-// Show the remaining filed route on a heading, and the cleared route on a direct.
-// Never reconnect an "end here" direct to the old flight plan.
-export function routeDisplayPoints(track){
-  const remaining=remainingPlanPoints(track);
-  if(track?.navigationMode !== 'direct') return remaining;
-  const direct=track.directTo;
-  if(!validPoint(direct?.target)) return [];
-  const points=[direct.target];
-  if(direct.plan && direct.plan === track.flightPlan){
-    if(Number.isInteger(direct.planIndex)){
-      points.push(...remaining.filter(p=>p.index > direct.planIndex));
-    }else if(Number.isInteger(direct.rejoinIndex)){
-      points.push(...remaining.filter(p=>p.index >= direct.rejoinIndex));
-    }
-  }
-  return points;
-}
+import { validPoint } from '../radar/routes.js';
+import { plannedRoutePoints as routeDisplayPoints } from '../radar/planned-route.js';
+export { routeDisplayPoints };
 
 // Called in the map's world transform. Symbols and names keep a fixed CSS size.
 export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null,previewPoint=null){

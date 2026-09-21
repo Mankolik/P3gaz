@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createSectorIndex} from '../src/radar/sectors.js';
 import {createAirspaceIndex,airspaceAt,TMA_DESIGNATORS} from '../src/radar/airspace.js';
-import {buildTrajectory} from '../src/radar/trajectory.js';
+import {buildTrajectory,trajectoryRoute} from '../src/radar/trajectory.js';
+import {routeDisplayPoints} from '../src/render/route-display.js';
 import {setFlightPlan,assignHeading,assignDirectTo} from '../src/radar/routes.js';
 import {updateTrafficControl,advanceTraffic,statusForSector} from '../src/radar/traffic-control.js';
 import {issueInstruction} from '../src/radar/coordination.js';
@@ -130,7 +131,47 @@ test('trajectory cache is reused for idle ticks and invalidated by route, PEL or
   issueInstruction(t,'exitFlightLevel',370);updateTrafficControl(s);assert.notEqual(t.trajectory,first);
   const second=t.trajectory;assignDirectTo(t,{name:'WEST',lon:-4,lat:0});updateTrafficControl(s);
   assert.notEqual(t.trajectory,second);assert.equal(t.status,'unconcerned');
-  assignHeading(t,90);updateTrafficControl(s);const vector=t.trajectory;updateTrafficControl(s,0.1);assert.equal(t.trajectory,vector);
+  assignHeading(t,90);updateTrafficControl(s);const filed=t.trajectory;updateTrafficControl(s,0.1);assert.equal(t.trajectory,filed);
+});
+
+test('assigned, held and actual headings do not replace the drawn route or alter its sector prediction',()=>{
+  const t=track(-2),s=state(t);t.exitFlightLevel=370;updateTrafficControl(s);
+  const original=t.trajectory;
+  assert.deepEqual(sectors(original),['EDU','ALLFIR','ESA']);
+  for(const heading of [270,180,0,null]){
+    assignHeading(t,heading);t.heading=heading ?? 45;
+    updateTrafficControl(s,0.1);
+    assert.equal(t.trajectory,original,'heading alone does not invalidate the route prediction');
+    assert.deepEqual(buildTrajectory(t,s.air.airspaceIndex),original);
+    assert.deepEqual(trajectoryRoute(t),routeDisplayPoints(t));
+  }
+  // Editing route geometry on a heading must still invalidate the prediction.
+  t.flightPlan.waypoints=[{name:'WEST',lon:-4,lat:0}];updateTrafficControl(s);
+  assert.notEqual(t.trajectory,original);assert.deepEqual(sectors(t.trajectory),['EDU']);
+});
+
+test('prediction follows drawn direct/rejoin/end-here paths and never invents a heading path for an empty route',()=>{
+  const t=track(-2),i=index();
+  setFlightPlan(t,[{name:'MIDDLE',lon:2,lat:0},{name:'END',lon:6,lat:0}]);
+  assignDirectTo(t,{name:'WEST',lon:-4,lat:0},{rejoinIndex:1});
+  assert.deepEqual(trajectoryRoute(t),routeDisplayPoints(t));
+  assert.deepEqual(trajectoryRoute(t).map(p=>p.name),['WEST','END']);
+  assert.deepEqual(sectors(buildTrajectory(t,i)),['EDU','ALLFIR','ESA']);
+  assignDirectTo(t,{name:'WEST',lon:-4,lat:0});
+  assert.deepEqual(trajectoryRoute(t),routeDisplayPoints(t));
+  assert.deepEqual(sectors(buildTrajectory(t,i)),['EDU']);
+  t.flightPlan=null;assignHeading(t,90);
+  assert.deepEqual(trajectoryRoute(t),[]);
+  const stationary=buildTrajectory(t,i);
+  assert.deepEqual(sectors(stationary),['EDU']);assert.equal(stationary.points.length,1);
+});
+
+test('prediction stops where the drawn route stops at missing geometry',()=>{
+  const t=track(-2);
+  t.flightPlan.waypoints=[{name:'VALID',lon:-1,lat:0},{name:'MISSING',lon:NaN,lat:0},{name:'END',lon:6,lat:0}];
+  assert.deepEqual(trajectoryRoute(t),routeDisplayPoints(t));
+  assert.deepEqual(trajectoryRoute(t).map(p=>p.name),['VALID']);
+  assert.deepEqual(sectors(buildTrajectory(t,index())),['EDU']);
 });
 
 test('a departure PEL coordinates its last TMA before ALLFIR, even while still in FIS',()=>{
