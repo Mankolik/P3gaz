@@ -509,8 +509,8 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'WZZ1891');
     await page.mouse.move(1090,690);
     assert.equal(await sectorPanel.locator('.sector-panel__callsign').textContent(),'WZZ1891');
-    assert.equal(await sectorPanel.getAttribute('aria-label'),'Sector sequence');
-    assert.equal(await sectorPanel.locator('.sector-panel__header').textContent(),'Sector sequence');
+    assert.equal(await sectorPanel.getAttribute('aria-label'),'Extended Label Window');
+    assert.equal(await sectorPanel.locator('.sector-panel__header').textContent(),'Extended Label Window');
     assert.match(await sectorPanel.locator('.sector-panel__sequence').textContent(),/^ALLFIR/);
     const panelBeforeDrag = await sectorPanel.boundingBox();
     const panelHeader = await sectorPanel.locator('.sector-panel__header').boundingBox();
@@ -527,7 +527,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       track.actualFlightLevel=360;
       track.clearedFlightLevel=360;
     });
-    await page.waitForFunction(()=>document.querySelector('.sector-panel__level').textContent.includes('AFL 360'));
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel [data-field="cfl"]').textContent==='CFL360');
     // Physical detail stays in the tooltip; the window uses grouped sectors.
     for(const [level,name,limits,sector] of [
       [25,'EPKK LTMA','2300 FT AMSL–3500 FT AMSL','APKK'],
@@ -575,7 +575,8 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       return sector && sector!=='ALLFIR';
     });
     const lot = page.locator('.track-label').filter({has:page.locator('.callsign',{hasText:'LOT612'})});
-    await lot.hover({force:true});
+    // The wider ELW can overlap this fixed fixture position after dragging.
+    await lot.dispatchEvent('pointerenter');
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'LOT612');
     assert.match(await sectorPanel.locator('.sector-panel__sequence').textContent(),/^APGD/);
     await page.setViewportSize({width:800,height:600});

@@ -1,31 +1,43 @@
+import { extendedLabelData, extendedSectorSequence } from './extended-label-data.js';
+
 export function mountSectorPanel(parent, overlay, state){
   const panel = document.createElement('section');
   panel.id = 'track-sector-panel';
   panel.className = 'sector-panel';
-  panel.setAttribute('aria-label', 'Sector sequence');
+  panel.setAttribute('aria-label', 'Extended Label Window');
   const header = document.createElement('div');
   header.className = 'sector-panel__header';
-  header.textContent = 'Sector sequence';
+  header.textContent = 'Extended Label Window';
   header.title = 'Drag to move. Arrow keys move the window when focused.';
   header.tabIndex = 0;
-  const callsign = document.createElement('div');
-  callsign.className = 'sector-panel__callsign';
-  const level = document.createElement('div');
-  level.className = 'sector-panel__level';
-  const trajectory = document.createElement('div');
-  trajectory.className = 'sector-panel__trajectory';
-  const sequenceLine = document.createElement('div');
-  sequenceLine.className = 'sector-panel__sequence';
-  const crossings = document.createElement('div');
-  crossings.className = 'sector-panel__crossings';
-  const message = document.createElement('div');
-  message.className = 'sector-panel__message';
-  trajectory.append(sequenceLine, crossings);
-  panel.append(header, callsign, level, trajectory, message);
+  const content=document.createElement('div');
+  content.className='elw-content';
+  const fields=new Map();
+  const rows=[['callsign','rvsm','spacing','radio','transponder'],['type','wake','status'],[],
+    ['departure','destination','frequency'],['rules','route'],['cfl','ecl'],['freeText'],[],
+    ['selectedAltitude','heading','track'],['ias','mach','gs']];
+  const green=new Set(['callsign','rvsm','spacing','radio','frequency']);
+  rows.forEach((keys,index)=>{
+    const row=document.createElement('div');row.className='elw-row';row.dataset.row=index+1;
+    if(index===7){row.classList.add('elw-sequence','sector-panel__sequence');row.setAttribute('aria-label','Sector sequence and exit levels');}
+    for(const key of keys){
+      const field=document.createElement('span');field.dataset.field=key;
+      field.className=green.has(key) ? 'elw-green' : key==='rules' ? 'elw-yellow' : '';
+      if(key==='callsign')field.classList.add('sector-panel__callsign');
+      if(key==='freeText')field.classList.add('elw-freetext');
+      if(key==='rvsm')field.title='RVSM status';
+      if(key==='spacing')field.title='8.33 kHz status';
+      fields.set(key,field);row.append(field);
+    }
+    content.append(row);
+  });
+  panel.append(header,content);
+  const sequenceRow=content.querySelector('.elw-sequence');
   parent.appendChild(panel);
 
   let selectedId = null;
   let lastDisplay = '';
+  let lastSequence = '';
   let position = { x:parent.clientWidth-panel.offsetWidth-16, y:16 };
   const place = ()=>{
     position.x = Math.max(0, Math.min(position.x, parent.clientWidth-panel.offsetWidth));
@@ -35,32 +47,25 @@ export function mountSectorPanel(parent, overlay, state){
   };
   const refresh = ()=>{
     const track = state.air.tracks.find(track=>track.id === selectedId);
-    const name = track?.callsign || (selectedId ? 'Track unavailable' : 'Hover a track label');
-    const actualLevel = Number.isFinite(track?.actualFlightLevel)
-      ? `AFL ${String(Math.round(track.actualFlightLevel)).padStart(3,'0')}` : '';
-    const prediction=track?.trajectory;
-    const sequence=prediction?.sequence || [];
-    const summary=sequence.map(v=>v.sector).join(' → ');
-    const crossingText=sequence.length ? `Current: ${sequence[0].sector}\n`+
-      (sequence.length>1 ? 'Predicted entry · FL · distance ahead\n'+
-        sequence.slice(1).map(v=>`${v.sector} · FL${String(Math.round(v.entry.level)).padStart(3,'0')} · ${v.entry.distanceNm.toFixed(1)} NM`).join('\n')
-        : 'No further sector crossing on this route.') : '';
-    const status=[!selectedId ? 'The last hovered track stays selected here.'
-      : !track ? 'Hover another track label to see its sequence.'
-      : !sequence.length ? prediction?.reason || 'Sector sequence unavailable.'
-      : !prediction.complete ? prediction.reason || 'Prediction incomplete.' : '',
-      track?.coordinationMessage].filter(Boolean).join('\n');
-    const levelText=[actualLevel,track?.control?.owner ? `Control: ${track.control.owner}` : ''].filter(Boolean).join(' · ');
-    const display = JSON.stringify([selectedId,name,levelText,summary,crossingText,status]);
+    const data=extendedLabelData(track);
+    const sequence=extendedSectorSequence(track);
+    const display=JSON.stringify([selectedId,data,sequence]);
     if(display === lastDisplay) return;
     lastDisplay = display;
     panel.dataset.trackId = selectedId || '';
-    panel.dataset.currentSector = sequence[0]?.sector || '';
-    callsign.textContent = name;
-    level.textContent = levelText;
-    sequenceLine.textContent = summary;
-    crossings.textContent = crossingText;
-    message.textContent = status;
+    panel.dataset.currentSector = track?.trajectory?.sequence[0]?.sector || '';
+    for(const [key,field] of fields){
+      const value=!data && key==='callsign' ? (selectedId ? 'Track unavailable' : 'Hover a track label') : data?.[key] || '';
+      if(field.textContent!==value)field.textContent=value;
+    }
+    const sequenceDisplay=JSON.stringify(sequence);
+    if(sequenceDisplay!==lastSequence){
+      lastSequence=sequenceDisplay;
+      sequenceRow.replaceChildren(...sequence.map(visit=>{
+        const span=document.createElement('span');span.className=`elw-sector elw-sector--${visit.status}`;
+        span.textContent=visit.text;return span;
+      }));
+    }
     place();
   };
   overlay.addEventListener('track-hover', event=>{

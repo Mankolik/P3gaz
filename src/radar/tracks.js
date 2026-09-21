@@ -24,6 +24,7 @@ export function createTrack(data, project, index=0, airwayResolver=null){
   const base = {
     id,
     callsign: data.callsign || id.toUpperCase(),
+    radioCallsign: data.radioCallsign || null,
     status,
     lat: data.lat,
     lon: data.lon,

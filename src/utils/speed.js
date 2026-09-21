@@ -79,6 +79,21 @@ export function convertMachToTas(mach, altitudeFt){
   return m * speedOfSound * MS_TO_KNOT;
 }
 
+// Invert this simulator's own GS/ISA model for live Mode S display. This uses
+// current speed (including acceleration), never the requested IAS/Mach target.
+export function calculateAirSpeeds(groundSpeed, altitudeFt, headingDeg=0, wind=null){
+  if(!Number.isFinite(groundSpeed) || groundSpeed<0 || !Number.isFinite(altitudeFt))return null;
+  const windSpeed=Number.isFinite(wind?.speed) ? wind.speed : 0;
+  if(windSpeed && !Number.isFinite(headingDeg))return null;
+  const relative=headingToRad((wind?.direction || 0)+180-(headingDeg || 0));
+  const along=windSpeed*Math.cos(relative),across=windSpeed*Math.sin(relative);
+  const squared=groundSpeed*groundSpeed-across*across;
+  if(squared < -1e-6)return null;
+  const tas=Math.sqrt(Math.max(0,squared))-along;
+  if(tas < -1e-6)return null;
+  return {ias:Math.max(0,tas)/convertIasToTas(1,altitudeFt),mach:Math.max(0,tas)/convertMachToTas(1,altitudeFt)};
+}
+
 export function parseSpeedInstruction(input, defaultMode='IAS'){
   const modeHint = (defaultMode || 'IAS').toUpperCase() === 'MACH' ? 'Mach' : (defaultMode || 'IAS').toUpperCase() === 'MN' ? 'Mach' : 'IAS';
   if(input == null) return {mode:modeHint,value:null};
