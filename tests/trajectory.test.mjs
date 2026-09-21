@@ -74,13 +74,69 @@ test('lower PEL keeps departure below TMA top until horizontal exit; same-group 
   assert.equal(prediction.sequence[1].entry.level,150);assert(Math.abs(prediction.sequence[1].entry.lon-1)<1e-6);
 });
 
-test('polygon holes, narrow sectors and return visits remain in the sequence',()=>{
+test('short polygon-hole visits disappear while meaningful return visits remain',()=>{
   const i=index();i.epww[0].polygons[0].rings.push(ring(1.5,1.51));
   const extra=createAirspaceIndex(createSectorIndex([collection([acc()])]),collection([fir('EPWWFIR',0,4),fir('ESAAFIR',1.5,1.51)]));
   i.firs.push(extra.firs[1]);
   const prediction=buildTrajectory(track(),i);
-  assert.deepEqual(sectors(prediction),['EDU','ALLFIR','ESA','ALLFIR','ESA']);
-  assert(prediction.sequence[2].exit.distanceNm-prediction.sequence[2].entry.distanceNm<1);
+  assert.deepEqual(sectors(prediction),['EDU','ALLFIR','ESA']);
+  assert(prediction.omitted[0].exit.distanceNm-prediction.omitted[0].entry.distanceNm<1);
+  i.epww[0].polygons[0].rings[1]=ring(1.5,1.6);
+  i.firs.at(-1).polygons[0].rings[0]=ring(1.5,1.6);
+  i.firs.at(-1).polygons[0].bounds.maxLon=1.6;
+  assert.deepEqual(sectors(buildTrajectory(track(),i)),['EDU','ALLFIR','ESA','ALLFIR','ESA']);
+});
+
+test('inbound transfers ignore a short ALLFIR island and use the intended entry boundary',()=>{
+  const i=createAirspaceIndex(createSectorIndex([collection([acc()])]),collection([
+    fir('EPWWFIR',0,0.04),fir('EPWWFIR',1,4),fir('EDUUUIR',-5,0),fir('EDUUUIR',0.04,1),fir('ESAAFIR',4,8)]));
+  const t=track(-0.1),s=state(t,i);updateTrafficControl(s);
+  assert.deepEqual(sectors(t.trajectory),['EDU','ALLFIR','ESA']);
+  assert(Math.abs(t.trajectory.sequence[1].entry.lon-1)<1e-6);
+  assert.equal(t.control.owner,'EDU','being within ten miles of the omitted island must not accept');
+  const cfl=t.clearedFlightLevel,visit=t.control.visit;
+  t.lon=0.02;updateTrafficControl(s);
+  assert.equal(t.control.physical,'ALLFIR');assert.equal(t.control.activeSector,'EDU');
+  assert.equal(t.control.owner,'EDU');assert.equal(t.status,'inbound');assert.equal(t.control.visit,visit);
+  assert.equal(t.clearedFlightLevel,cfl);
+  t.lon=0.05;updateTrafficControl(s);assert.equal(t.control.owner,'EDU');
+  t.lon=0.82;updateTrafficControl(s);assert.equal(t.control.owner,'EDU');
+  t.lon=0.84;updateTrafficControl(s);assert.equal(t.control.owner,'ALLFIR');
+  t.lon=1.01;updateTrafficControl(s);assert.equal(t.control.activeSector,'ALLFIR');
+});
+
+test('outbound transfer bypasses a short TMA, keeps ownership through it and does not shorten an established visit',()=>{
+  const t=track(3.7),s=state(t,index([tma('EPWA',3.85,3.89,0,400)]));
+  updateTrafficControl(s);updateTrafficControl(s,4);
+  assert.deepEqual(sectors(t.trajectory),['ALLFIR','ESA']);
+  assert.equal(t.control.owner,'ALLFIR','ten miles before the short TMA is too early for ESA');
+  t.lon=3.84;updateTrafficControl(s);assert.equal(t.control.owner,'ESA');
+  const visit=t.control.visit,cfl=t.clearedFlightLevel;
+  t.lon=3.86;updateTrafficControl(s);assert.equal(t.control.physical,'APWA');
+  assert.equal(t.control.activeSector,'ALLFIR');assert.equal(t.control.owner,'ESA');
+  assert.equal(t.control.visit,visit);assert.equal(t.clearedFlightLevel,cfl);
+  t.lon=3.99;updateTrafficControl(s);assert.equal(t.trajectory.sequence[0].sector,'ALLFIR');
+  assert.equal(t.control.owner,'ESA','last fraction of an established visit is not filtered');
+  t.lon=4.01;updateTrafficControl(s);assert.equal(t.control.activeSector,'ESA');
+  assert.equal(t.status,'unconcerned');
+});
+
+test('rerouting while inside an omitted visit promotes it if there is no longer a short exit',()=>{
+  const t=track(3.7),s=state(t,index([tma('EPWA',3.85,3.89,0,400)]));
+  updateTrafficControl(s);t.lon=3.86;updateTrafficControl(s,4);
+  assert.equal(t.control.activeSector,'ALLFIR');
+  setFlightPlan(t,[{name:'STAY',lon:3.87,lat:0}]);updateTrafficControl(s);
+  assert.equal(t.control.activeSector,'APWA');assert.equal(t.control.owner,'APWA');
+  assert.deepEqual(sectors(t.trajectory),['APWA']);
+});
+
+test('computer-sector level changes update the profile immediately and boundary changes cancel due proposals',()=>{
+  const t=track(-2);t.plannedEntryLevel=null;t.clearedFlightLevel=300;
+  const s=state(t);updateTrafficControl(s);
+  assert.equal(t.trajectory.sequence[0].targetLevel,300);
+  issueInstruction(t,'speed',{mode:'Mach',value:0.76});
+  t.lon=0.1;updateTrafficControl(s,3);
+  assert.equal(t.control.pending.speed,undefined);assert.equal(t.assignedSpeed,undefined);
 });
 
 test('automatic transfers use along-route distance and give different sector-relative labels',()=>{

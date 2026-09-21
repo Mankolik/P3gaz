@@ -13,21 +13,27 @@ export function mountSectorPanel(parent, overlay, state){
   const content=document.createElement('div');
   content.className='elw-content';
   const fields=new Map();
-  const rows=[['callsign','rvsm','spacing','radio','transponder'],['type','wake','status'],[],
+  const rows=[['callsign','capabilities','radio','transponder'],['aircraft','status'],[],
     ['departure','destination','frequency'],['rules','route'],['cfl','ecl'],['freeText'],[],
     ['selectedAltitude','heading','track'],['ias','mach','gs']];
-  const green=new Set(['callsign','rvsm','spacing','radio','frequency']);
+  const green=new Set(['callsign','capabilities','radio','frequency']);
+  const modeS={selectedAltitude:'SEL ALT',heading:'HDG',track:'TRK',ias:'IAS',mach:'MN',gs:'GS'};
   rows.forEach((keys,index)=>{
     const row=document.createElement('div');row.className='elw-row';row.dataset.row=index+1;
+    if(index>=8)row.classList.add('elw-mode-s');
     if(index===7){row.classList.add('elw-sequence','sector-panel__sequence');row.setAttribute('aria-label','Sector sequence and exit levels');}
     for(const key of keys){
       const field=document.createElement('span');field.dataset.field=key;
       field.className=green.has(key) ? 'elw-green' : key==='rules' ? 'elw-yellow' : '';
       if(key==='callsign')field.classList.add('sector-panel__callsign');
       if(key==='freeText')field.classList.add('elw-freetext');
-      if(key==='rvsm')field.title='RVSM status';
-      if(key==='spacing')field.title='8.33 kHz status';
-      fields.set(key,field);row.append(field);
+      if(key==='capabilities')field.title='W: RVSM; Y: 8.33 kHz';
+      fields.set(key,field);
+      if(modeS[key]){
+        const pair=document.createElement('span');pair.className='elw-mode-s__pair';
+        const designator=document.createElement('small');designator.textContent=modeS[key];
+        pair.append(designator,field);row.append(pair);
+      }else row.append(field);
     }
     content.append(row);
   });

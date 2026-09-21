@@ -4,6 +4,7 @@ export { trajectoryRoute };
 import { aircraftCeiling, performanceSchedule } from './performance.js';
 import { effectiveSpeedInstruction } from './speed-control.js';
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
+import { filterSectorSequence } from './sector-sequence.js';
 
 export function distanceNm(a,b){
   const rad=Math.PI/180,dLat=(b.lat-a.lat)*rad,dLon=(b.lon-a.lon)*rad;
@@ -77,5 +78,6 @@ export function buildTrajectory(track,index){
     if(!complete)break;
   }
   sequence.at(-1).end=point;
-  return {points,sequence,complete,reason:complete?null:'Prediction limit reached; check route and coordinated levels'};
+  return {points,...filterSectorSequence(sequence,track.control),complete,
+    reason:complete?null:'Prediction limit reached; check route and coordinated levels'};
 }

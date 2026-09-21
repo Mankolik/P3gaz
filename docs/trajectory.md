@@ -31,6 +31,10 @@ Predictions refresh immediately on approved route/PEL/XFL changes and physical s
 
 ## Transfers and labels
 
+Upcoming visits with a known exit and no more than **3 NM along the predicted route** inside that sector are omitted from the sector sequence. The threshold is inclusive and measures cumulative route distance, including bends. Adjacent visits to the same sector merge across an omitted excursion. The geometric/altitude profile still resolves the loaded volumes to measure visits; omitted visits are excluded from route crossing markers, coordination and transfers. An already established current visit is retained as the aircraft approaches its exit, so it does not disappear when only 3 NM remain. A route ending inside a sector has no known onward exit and is retained.
+
+Physical membership remains available separately. While crossing an omitted volume, the aircraft keeps its preceding effective sector; that volume does not take ownership or issue a computer clearance. Transfers target the next retained sector's actual entry at 10 NM, not the earlier omitted boundary. Reroutes can promote a previously omitted current volume if the short onward crossing no longer exists. Pending coordination is cancelled on meaningful ownership/visit changes, not on an ignored physical crossing.
+
 The floating [Extended Label Window](extended-label-window.md) remembers the last hovered track. Row 8 shows its current and upcoming sector designators and exit levels in route order, coloured by ownership and sequence position; repeated visits remain in order. The other rows show flight details and live Mode S values. Drag the header or use its arrow keys to move the window. Predicted crossing markers and levels still appear when the route is displayed/previewed.
 
 - ALLFIR next: **inbound**; ALLFIR later in the sequence: **pre-inbound**.

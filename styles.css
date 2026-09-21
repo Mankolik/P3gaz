@@ -141,12 +141,12 @@ button.direct-to__apply{ background:#15372c; border-color:#276348; text-align:ce
   .track-label{ font-size:11px; }
 }
 /* BOTTOM BAR */
-.sector-panel{ position:absolute; z-index:100; width:560px; max-width:100%; max-height:100%; overflow:auto; background:var(--panel); border:1px solid var(--stroke); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.3); color:#fff; font:13px/22px 'Courier New',monospace; }
+.sector-panel{ position:absolute; z-index:100; width:360px; max-width:100%; max-height:100%; overflow:auto; background:var(--panel); border:1px solid var(--stroke); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.3); color:#fff; font:13px/22px 'Courier New',monospace; }
 .sector-panel__header{ padding:8px 12px; border-bottom:1px solid var(--stroke); color:#fff; font:12px/18px 'Aldrich',system-ui,sans-serif; cursor:grab; touch-action:none; user-select:none; }
 .sector-panel.dragging .sector-panel__header{ cursor:grabbing; }
 .sector-panel__header:focus-visible{ outline:1px solid var(--text); outline-offset:-2px; }
 .elw-content{ padding:10px 12px 12px; }
-.elw-row{ display:flex; align-items:baseline; gap:16px; min-height:22px; white-space:nowrap; overflow-x:auto; }
+.elw-row{ display:flex; align-items:baseline; gap:8px; min-height:22px; white-space:nowrap; overflow-x:auto; }
 .elw-row > span{ flex:none; }
 .elw-green,.elw-sector--current{ color:var(--track-green); }
 .elw-yellow,.elw-sector--skipped{ color:#ffff00; }
@@ -154,6 +154,10 @@ button.direct-to__apply{ background:#15372c; border-color:#276348; text-align:ce
 .elw-sector--later{ color:var(--track-gray); }
 .elw-freetext{ width:20ch; max-width:20ch; overflow:hidden; }
 .elw-row [data-field="status"]{ min-width:3ch; }
+.elw-mode-s{ display:grid; grid-template-columns:1.3fr 1fr 1fr; }
+.elw-mode-s__pair{ display:grid; grid-template-columns:18px max-content; align-items:baseline; }
+.elw-mode-s__pair:first-child{ grid-template-columns:42px max-content; }
+.elw-mode-s__pair small{ font-size:10px; text-align:right; }
 footer#bottombar{ background:var(--panel); border-top:1px solid var(--stroke); padding:8px }
 footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; border:1px solid var(--stroke); border-radius:999px }
 /* helpers */
