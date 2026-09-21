@@ -47,6 +47,17 @@ export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null,prev
       fixes.push({name:point.name,x,y});
     }
     ctx.stroke();
+    // The plan view shares the route line; crossing labels expose the
+    // predicted vertical profile without replacing filed waypoint labels.
+    if(track.trajectory){
+      ctx.save();ctx.fillStyle='#8fdde8';ctx.strokeStyle='#8fdde8';
+      for(const visit of track.trajectory.sequence.slice(1)){
+        const [x,y]=project(visit.entry.lon,visit.entry.lat);
+        ctx.strokeRect(x-4*scale,y-4*scale,8*scale,8*scale);
+        ctx.fillText(`${visit.sector} FL${String(Math.round(visit.entry.level)).padStart(3,'0')}`,x+7*scale,y+10*scale);
+      }
+      ctx.restore();
+    }
     for(const {name,x,y} of fixes){
       ctx.beginPath();
       ctx.arc(x,y,3*scale,0,Math.PI*2);

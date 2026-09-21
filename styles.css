@@ -95,6 +95,11 @@ header#topbar{ position:relative; z-index:100; min-height:48px; display:flex; al
 .track-label .row4 span[data-empty="true"],
 .track-label .row4 .assigned-ecl{ opacity:0; }
 .track-label:hover .row4 span{ opacity:1; }
+.track-label .level-segment .level-segment__value.is-proposed,
+.track-label .row4 span.is-proposed,
+.track-label .row4 .assigned-vertical.is-proposed,
+.track-label .destination.is-proposed{ color:#ff4040; opacity:1; }
+.sector-panel__trajectory{ white-space:pre-line; margin-top:10px; color:#8fdde8; max-height:240px; overflow:auto; }
 
 .track-label .destination{ appearance:none; margin:0; padding:0; border:0; border-radius:3px; background:transparent; font:inherit; letter-spacing:inherit; cursor:pointer; }
 .track-label .destination:hover{ background:rgba(255,255,255,.1); }

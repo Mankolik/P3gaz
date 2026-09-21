@@ -1,4 +1,5 @@
-import { assignDirectTo, pointName, remainingPlanPoints, validPoint } from '../radar/routes.js';
+import { pointName, remainingPlanPoints, validPoint } from '../radar/routes.js';
+import { issueInstruction } from '../radar/coordination.js';
 
 const previewPoints = new WeakMap();
 export const getDirectToPreviewPoint = panel=>previewPoints.get(panel) || null;
@@ -27,7 +28,7 @@ export function buildDirectToPicker(panel, {track,index,onChange,close}){
     }catch(err){ error.textContent=err.message; }
   };
   const pointButton=(label,point,options)=>{
-    const node=button(label,()=>guard(()=>assignDirectTo(track,point,options)));
+    const node=button(label,()=>guard(()=>issueInstruction(track,'direct',{point,options})));
     node.addEventListener('pointerenter',()=>previewPoints.set(panel,point));
     node.addEventListener('pointerleave',clearPreview);
     node.addEventListener('focus',()=>previewPoints.set(panel,point));
@@ -69,7 +70,7 @@ export function buildDirectToPicker(panel, {track,index,onChange,close}){
     guard(()=>{
       const matches=points.filter(p=>pointName(p.name) === pointName(search.value));
       if(matches.length !== 1) throw new Error(matches.length>1 ? 'This name has multiple locations. Select one from the list.' : 'Enter a known point name or select a matching point.');
-      assignDirectTo(track,matches[0]);
+      issueInstruction(track,'direct',{point:matches[0]});
     });
   }
   const apply=button('Fly direct',submit); apply.classList.add('direct-to__apply');

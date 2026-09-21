@@ -16,7 +16,9 @@ export function mountSectorPanel(parent, overlay, state){
   level.className = 'sector-panel__level';
   const details = document.createElement('div');
   details.className = 'sector-panel__details';
-  panel.append(header, callsign, level, details);
+  const trajectory = document.createElement('div');
+  trajectory.className = 'sector-panel__trajectory';
+  panel.append(header, callsign, level, details, trajectory);
   parent.appendChild(panel);
 
   let selectedId = null;
@@ -41,7 +43,12 @@ export function mountSectorPanel(parent, overlay, state){
       else description = membership.sectors.map(sector=>`${sector.name}\n${sectorLimitsText(sector)}`).join('\n\n');
       if(membership?.sectors.length > 1) description += '\n\nShared boundary / overlapping sectors';
     }
-    const display = JSON.stringify([selectedId,name,actualLevel,description]);
+    const prediction=track?.trajectory;
+    const sequence=prediction?.sequence || [];
+    const predicted=sequence.length ? `Control: ${track.control.owner}\nSequence: ${sequence.map(v=>v.sector).join(' → ')}\n`+
+      sequence.slice(1).map(v=>`${v.sector} · FL${String(Math.round(v.entry.level)).padStart(3,'0')} · ${v.entry.distanceNm.toFixed(1)} NM`).join('\n')+
+      (prediction.complete ? '' : `\n${prediction.reason}`) : '';
+    const display = JSON.stringify([selectedId,name,actualLevel,description,predicted,track?.coordinationMessage]);
     if(display === lastDisplay) return;
     lastDisplay = display;
     panel.dataset.trackId = selectedId || '';
@@ -49,6 +56,7 @@ export function mountSectorPanel(parent, overlay, state){
     callsign.textContent = name;
     level.textContent = actualLevel;
     details.textContent = description;
+    trajectory.textContent = [predicted,track?.coordinationMessage].filter(Boolean).join('\n');
     place();
   };
   overlay.addEventListener('track-hover', event=>{

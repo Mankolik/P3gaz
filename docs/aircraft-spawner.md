@@ -1,6 +1,6 @@
 # Aircraft spawner
 
-Use **+ Aircraft** at the top right. Each click creates one **accepted** track. The button waits for the navigation data and route catalogue; a load failure leaves it disabled with an explanation. A short message identifies the flight and its spawn fix or ground state.
+Use **+ Aircraft** at the top right. Each click creates one track whose label reflects its ownership and predicted entry into ALLFIR. The button waits for the navigation data and route catalogue; a load failure leaves it disabled with an explanation. A short message identifies the flight and its spawn fix or ground state. See [trajectory and coordination](trajectory.md) for airspace designators, automatic transfers and inbound proposals.
 
 ## Selection and initial levels
 
@@ -54,7 +54,7 @@ Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N0203
 
 ## Ground departures
 
-Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL/CFL 010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. The distance-based requested level is shown as ECL; the aircraft holds its current cleared level until the controller clears it higher. This is a generic departure, without taxi, runway roll or a published SID.
+Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. With airspace control loaded, the computer-controlled departure sector issues a CFL toward its coordinated exit level (PEL, initially ECL). Once ALLFIR accepts ownership, actual flight follows that clearance until the controller changes CFL. This is a generic departure, without taxi, runway roll or a published SID.
 
 ## Aircraft performance
 

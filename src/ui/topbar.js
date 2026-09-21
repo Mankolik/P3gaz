@@ -40,7 +40,7 @@ export function mountTopbar(root, state, bus){
 
   // Sector info
   const gSec=wrap('Sector');
-  const i1=el('div','info'); const kv1=el('div','kv'); kv1.append(el('span','k','Name:'), el('span','v',state.ui.top.sectorName)); i1.append(kv1); gSec.append(i1);
+  const i1=el('div','info'); const kv1=el('div','kv'); kv1.append(el('span','k','Name:'), el('span','v',state.air.controlledSector || state.ui.top.sectorName)); i1.append(kv1); gSec.append(i1);
   const i2=el('div','info'); const kv2=el('div','kv'); kv2.append(el('span','k','Freq:'), el('span','v',state.ui.top.sectorFreq)); i2.append(kv2); gSec.append(i2);
   root.append(gSec);
 

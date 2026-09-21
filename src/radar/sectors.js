@@ -11,7 +11,7 @@ function altitudeToFl(altitude){
   return null;
 }
 
-function compilePolygon(rings){
+export function compilePolygon(rings){
   if(!Array.isArray(rings) || !rings.length) return null;
   const bounds = { minLon:Infinity, maxLon:-Infinity, minLat:Infinity, maxLat:-Infinity };
   for(const ring of rings){
@@ -58,7 +58,7 @@ export function createSectorIndex(collections, { complete = true } = {}){
       const id = isTma ? `TMA:${props.icao}:${props.tma_id || `${props.tma}:${code}`}` : `${code}:${vertical}`;
       const name = props.name || (isTma ? `${props.tma}${['UTMA','TMA'].includes(code) ? '' : ` ${code}`}` : `${code} ${vertical}`);
       bands.forEach((band, bandIndex)=>sectors.push({
-        id:bands.length > 1 ? `${id}:${bandIndex}` : id, code, vertical, name,
+        id:bands.length > 1 ? `${id}:${bandIndex}` : id, code, vertical, name, icao:props.icao || null,
         kind:isTma ? 'TMA' : 'ACC',
         // Local terminal volumes mask broad UTMAs where both match in 3D.
         priority:isTma ? (vertical === 'UTMA' ? 1 : 2) : 0,
@@ -91,7 +91,7 @@ function classifyRing(lon, lat, ring){
   return inside ? 1 : 0;
 }
 
-function containsPoint(polygon, lon, lat){
+export function containsPoint(polygon, lon, lat){
   const { bounds, rings } = polygon;
   if(lon < bounds.minLon-EDGE_EPSILON || lon > bounds.maxLon+EDGE_EPSILON
     || lat < bounds.minLat-EDGE_EPSILON || lat > bounds.maxLat+EDGE_EPSILON) return false;
