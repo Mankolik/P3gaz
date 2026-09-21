@@ -22,10 +22,11 @@ export function createAirspaceIndex(sectorIndex, firCollection){
 
 const horizontal=(v,p)=>v.polygons.some(poly=>containsPoint(poly,p.lon,p.lat));
 const covers=(v,p,fl)=>fl>=v.minFl && fl<v.maxFl && horizontal(v,p);
+export const insideEpww=(index,point)=>!!index?.epww?.some(v=>horizontal(v,point));
 
 export function airspaceAt(index, point, level, previous=null){
   if(!index?.complete || !Number.isFinite(level)) return 'UNKNOWN';
-  const inside=index.epww.some(v=>horizontal(v,point));
+  const inside=insideEpww(index,point);
   const matches=index.volumes.filter(v=>(v.kind==='TMA' || inside) && covers(v,point,level));
   const priority=Math.max(-1,...matches.map(v=>v.priority));
   const groups=[...new Set(matches.filter(v=>v.priority===priority).map(v=>v.designator))];

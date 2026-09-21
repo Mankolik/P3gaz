@@ -10,15 +10,15 @@ test('ELW formats live values, identifiers, leading zeros and reserved fields',(
     squawk:'0123',actualFlightLevel:350,clearedFlightLevel:370,expectedCruiseLevel:390,
     heading:359.8,groundSpeed:convertMachToTas(0.78,35000),assignedSpeed:{mode:'Mach',value:0.79}};
   const d=extendedLabelData(t);
-  assert.equal(d.radio,'WIZZAIR 01AB');assert.equal(d.transponder,'S/0123');
-  assert.equal(d.cfl,'CFL370');assert.equal(d.ecl,'ECL390');assert.equal(d.selectedAltitude,'SEL ALT FL370');
-  assert.equal(d.heading,'HDG 000º');assert.equal(d.track,'TRK 000º');
-  assert.equal(d.mach,'MN 0.78');assert.match(d.ias,/^IAS \d{3}$/);assert.match(d.gs,/^GS \d{3}$/);
-  assert.equal(d.rvsm,'W');assert.equal(d.spacing,'Y');assert.equal(d.rules,'I');
+  assert.equal(d.radio,'WIZZAIR01AB');assert.equal(d.transponder,'S/0123');
+  assert.equal(d.cfl,'CFL370');assert.equal(d.ecl,'ECL390');assert.equal(d.selectedAltitude,'FL370');
+  assert.equal(d.heading,'000°');assert.equal(d.track,'000°');
+  assert.equal(d.mach,'0.78');assert.match(d.ias,/^\d{3}$/);assert.match(d.gs,/^\d{3}$/);
+  assert.equal(d.capabilities,'WY');assert.equal(d.aircraft,'A320/M');assert.equal(d.rules,'I');
   assert.equal(d.frequency,'XXX,XXX');assert.equal(d.status,'');assert.equal(d.freeText,'');
   assert.equal(d.departure,'EPWA');assert.equal(d.destination,'EPKK');
-  t.clearedFlightLevel=null;assert.equal(extendedLabelData(t).selectedAltitude,'SEL ALT FL---');
-  assert.equal(extendedLabelData({}).transponder,'S/----');assert.equal(extendedLabelData({}).ias,'IAS ---');
+  t.clearedFlightLevel=null;assert.equal(extendedLabelData(t).selectedAltitude,'FL---');
+  assert.equal(extendedLabelData({}).transponder,'S/----');assert.equal(extendedLabelData({}).ias,'---');
   assert.equal(extendedLabelData({squawk:''}).transponder,'S/----');
   assert.equal(extendedLabelData(null),null);
 });
@@ -41,7 +41,7 @@ test('live IAS/Mach reverse the simulator speed model at low/high levels and wit
     }
   }
   const t={groundSpeed:convertIasToTas(180,1000),actualFlightLevel:10,assignedSpeed:{mode:'IAS',value:250}};
-  assert.equal(extendedLabelData(t).ias,'IAS 180','show actual accelerating speed, not clearance');
+  assert.equal(extendedLabelData(t).ias,'180','show actual accelerating speed, not clearance');
   assert.equal(calculateAirSpeeds(null,0),null);assert.equal(calculateAirSpeeds(100,null),null);
   assert.equal(calculateAirSpeeds(0,0).ias,0);
 });
@@ -59,10 +59,12 @@ test('ELW sequence uses ownership colours, next sector, reserved skipped state a
       {sector:'APWA',targetLevel:180,skipped:true},{sector:'ESA',targetLevel:350}]}};
   assert.deepEqual(extendedSectorSequence(t),[
     {text:'EDU/350',status:'current'},{text:'ALLFIR/---',status:'next'},
-    {text:'APWA/180',status:'skipped'},{text:'ESA/350',status:'later'}]);
+    {text:'APWA/180',status:'skipped'},{text:'ESA',status:'later'}]);
   t.control.owner='ALLFIR';t.exitFlightLevel=370;t.sectorExitLevels={ESA:330};
   assert.deepEqual(extendedSectorSequence(t).slice(1),[
     {text:'ALLFIR/370',status:'current'},{text:'APWA/180',status:'skipped'},
-    {text:'ESA/330',status:'next'}]);
+    {text:'ESA',status:'next'}]);
   assert.deepEqual(extendedSectorSequence(null),[]);
+  t.control.hasEntered=true;t.control.owner='ESA';t.trajectory.sequence=[{sector:'ESA',targetLevel:350},{sector:'ALLFIR',targetLevel:370},{sector:'EDU',targetLevel:350}];
+  assert.deepEqual(extendedSectorSequence(t).map(v=>v.text),['ESA','ALLFIR/370','EDU']);
 });

@@ -1,17 +1,17 @@
 # Extended Label Window
 
-The floating ELW replaces the sector-sequence inspector. It remembers the last hovered aircraft, refreshes on simulation ticks, and keeps header dragging, keyboard arrow movement and viewport bounds. Ten rows follow the supplied `ELW.txt` specification; rows stay distinct and long rows scroll horizontally in narrow windows.
+The floating ELW replaces the sector-sequence inspector. It remembers the last hovered aircraft, refreshes on simulation ticks, and keeps header dragging, keyboard arrow movement and viewport bounds. It is 360 px wide (36% narrower than the original 560 px window). Ten rows follow the supplied `ELW.txt` specification and subsequent compact-layout instructions; rows stay distinct and long rows scroll horizontally in narrow windows.
 
-1. Green callsign, green `W` (RVSM), green `Y` (8.33 kHz), green full radio callsign, white `S/` immediately followed by the four-digit squawk.
-2. ICAO aircraft type, wake category, reserved blank status.
+1. Green callsign, green joined `WY` (RVSM/8.33 kHz), green radio callsign with its flight suffix joined (`LOT123`), white `S/` immediately followed by the four-digit squawk.
+2. Joined ICAO aircraft type/wake category (`A320/M`), reserved blank status.
 3. Blank.
 4. Departure and destination aerodromes, green `XXX,XXX` next frequency.
 5. Yellow `I`, followed by up to five next points from the same route used for drawing and prediction.
 6. White `CFLxxx` and `ECLxxx`.
 7. Blank, reserved for future free text in a 20-character space. There is no editor yet.
-8. Existing sector sequence, as explicitly requested after the file was supplied: `SECTOR/XFL`. Green marks the owning sector, white the next non-skipped visit, gray later visits. Yellow is defined for visits explicitly marked `skipped`; prediction currently omits bypassed volumes and does not invent skipped visits. Repeated visits remain ordered. The local XFL stays `---` when unset; remote sectors use their coordinated exit level or predicted sector target when no explicit level is stored.
-9. White `SEL ALT FLxxx` (actual accepted CFL for now), `HDG xxxº`, `TRK xxxº` (same as current heading for now).
-10. White `IAS xxx`, `MN 0.xx`, `GS xxx`, without knot suffixes.
+8. `SECTOR/XFL` sequence. Green marks the owning sector, white the next non-skipped visit, gray later visits. Yellow is reserved for explicitly marked skipped visits; visits of 3 NM or less are omitted completely. Repeated meaningful visits remain ordered. The local XFL stays `---` when unset; remote sectors use their coordinated exit level or predicted target when no explicit level is stored. Foreign sectors after leaving EPWW show just their designator (`ESA`); the foreign inbound sector still shows its XFL. EPWW TMAs/FIS retain their levels, including on a return visit.
+9. `SEL ALTFLxxx` (actual accepted CFL), `HDGxxx°`, `TRKxxx°` (same as current heading for now).
+10. `IASxxx`, `MN0.xx`, `GSxxx`, without knot suffixes. Mode S designators use a smaller 10 px font beside regular 13 px values. The three value columns align between rows 9 and 10; designators align right without a gap before their values.
 
 All other characters are white. W/Y/I and Mode S are the requested simulator defaults, not inferred real-world equipment declarations. Missing values show dashes, including `S/----` when no squawk is stored; the window does not allocate transponder codes. Pending proposals do not replace accepted values here.
 

@@ -47,16 +47,23 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   await label.hover();
   const panel=page.getByRole('region',{name:'Extended Label Window'});
   assert.equal(await panel.locator('.elw-row').count(),10);
-  assert.deepEqual(await panel.locator('[data-row="1"] span').allTextContents(),['LOT123','W','Y','LOT 123','S/0123']);
-  assert.deepEqual(await panel.locator('[data-row="2"] span').allTextContents(),['A320','M','']);
+  assert.deepEqual(await panel.locator('[data-row="1"] span').allTextContents(),['LOT123','WY','LOT123','S/0123']);
+  assert.deepEqual(await panel.locator('[data-row="2"] span').allTextContents(),['A320/M','']);
   assert.equal(await panel.locator('[data-row="3"]').textContent(),'');
   assert.deepEqual(await panel.locator('[data-row="4"] span').allTextContents(),['EPWA','ESSA','XXX,XXX']);
   assert.deepEqual(await panel.locator('[data-row="5"] span').allTextContents(),['I','MIDDLE END']);
   assert.deepEqual(await panel.locator('[data-row="6"] span').allTextContents(),['CFL350','ECL380']);
   assert.equal(await panel.locator('[data-row="7"]').textContent(),'');
-  assert.deepEqual(await panel.locator('.elw-sector').allTextContents(),['EDU/350','ALLFIR/---','ESA/350']);
-  assert.deepEqual(await panel.locator('[data-row="9"] span').allTextContents(),['SEL ALT FL350','HDG 090º','TRK 090º']);
-  assert.deepEqual(await panel.locator('[data-row="10"] span').allTextContents(),['IAS 250','MN 0.78','GS 450']);
+  assert.deepEqual(await panel.locator('.elw-sector').allTextContents(),['EDU/350','ALLFIR/---','ESA']);
+  assert.deepEqual(await panel.locator('[data-row="9"] [data-field]').allTextContents(),['FL350','090°','090°']);
+  assert.deepEqual(await panel.locator('[data-row="10"] [data-field]').allTextContents(),['250','0.78','450']);
+  assert.equal((await panel.boundingBox()).width,360);
+  for(const [upper,lower] of [['selectedAltitude','ias'],['heading','mach'],['track','gs']]){
+    const top=panel.locator(`[data-field="${upper}"]`),bottom=panel.locator(`[data-field="${lower}"]`);
+    assert.equal((await top.boundingBox()).x,(await bottom.boundingBox()).x,'Mode S values align vertically');
+    assert.equal(await top.evaluate(el=>getComputedStyle(el).fontSize),'13px');
+  }
+  assert.equal(await panel.locator('.elw-mode-s small').first().evaluate(el=>getComputedStyle(el).fontSize),'10px');
   const color=field=>panel.locator(field).evaluate(el=>getComputedStyle(el).color);
   assert.equal(await color('[data-field="callsign"]'),'rgb(0, 255, 85)');
   assert.equal(await color('[data-field="radio"]'),'rgb(0, 255, 85)');
@@ -73,7 +80,7 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   await page.evaluate(()=>window.test.advance(0.1));assert.equal(await label.locator('.is-proposed').count(),0);
   assert.deepEqual(await page.evaluate(()=>[window.test.t.plannedEntryLevel,window.test.t.clearedFlightLevel,window.test.t.sectorExitLevels.EDU]),[300,300,300]);
   assert.equal(await panel.locator('[data-field="cfl"]').textContent(),'CFL300');
-  assert.equal(await panel.locator('[data-field="selectedAltitude"]').textContent(),'SEL ALT FL300');
+  assert.equal(await panel.locator('[data-field="selectedAltitude"]').textContent(),'FL300');
   await label.locator('.destination').click();await page.locator('.direct-to__points button').filter({hasText:'END'}).click();
   assert.equal(await label.locator('.destination').textContent(),'END');assert.equal(await label.locator('.destination.is-proposed').count(),1);
   assert.equal(await page.evaluate(()=>window.test.t.flightPlan.nextIndex),0);

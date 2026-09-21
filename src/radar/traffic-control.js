@@ -1,4 +1,4 @@
-import { airspaceAt } from './airspace.js';
+import { airspaceAt, insideEpww } from './airspace.js';
 import { buildTrajectory, trajectoryRoute, distanceNm, sectorTargetLevel } from './trajectory.js';
 import { advanceProposals } from './coordination.js';
 import { updateTrackMovement } from './movement.js';
@@ -11,7 +11,7 @@ export const TRANSFER_DISTANCE_NM=10;
 // itself. Another controller can derive a different label for the same track.
 export function statusForSector(track,sector){
   if(track.control?.owner===sector)return 'accepted';
-  if(track.control?.physical===sector)return 'intruder';
+  if((track.control?.activeSector ?? track.control?.physical)===sector)return 'intruder';
   const next=track.trajectory?.sequence.findIndex(visit=>visit.sector===sector) ?? -1;
   return next===1 ? 'inbound' : next>1 ? 'preinbound' : 'unconcerned';
 }
@@ -22,39 +22,56 @@ export function updateTrafficControl(state,seconds=0){
   const controlled=state.air.controlledSector || 'ALLFIR';
   for(const track of state.air.tracks){
     const physical=airspaceAt(index,track,track.actualFlightLevel,track.control?.physical);
-    if(!track.control)track.control={sector:controlled,owner:physical,physical,time:0,pending:{},
+    if(!track.control)track.control={sector:controlled,owner:physical,physical,activeSector:physical,retainPhysicalVisit:true,time:0,pending:{},
       hasEntered:physical===controlled,enteredAt:physical===controlled?0:null,visit:0};
     const c=track.control;
+    c.activeSector ??= c.physical;
+    c.hasEnteredFir ||= insideEpww(index,track);
     c.time+=Math.max(0,seconds);
     const previous=c.physical;
     if(previous!==physical){
-      c.physical=physical;c.visit++;
-      if(physical===controlled){c.hasEntered=true;c.enteredAt=c.time;c.owner=controlled;c.sentTo=null;}
-      else if(previous===controlled || c.owner===previous){c.owner=physical;c.sentTo=null;}
+      const next=track.trajectory?.sequence[1],origin=track.trajectory?.points[0];
+      // The same designator may occur in an omitted island before the real
+      // entry. Retain only the visit whose entry we have actually reached.
+      c.retainPhysicalVisit=physical===c.activeSector || (next?.sector===physical && origin
+        && distanceNm(origin,track)+1e-6>=next.entry.distanceNm);
+      c.physical=physical;
       track.labelRevision=(track.labelRevision || 0)+1;
     }
-    // Computer sectors fly their coordinated exit level. The receiving sector
-    // does not start its climb/descent while still in the previous volume.
-    if(physical!==controlled && physical!=='UNKNOWN' && c.owner!==controlled && c.computerSector!==physical){
-      c.computerSector=physical;
-      c.computerTargetLevel=sectorTargetLevel(track,physical,track.clearedFlightLevel ?? track.actualFlightLevel,!c.hasEntered);
+    if(previous===physical)advanceProposals(track);
+    const routeKey=trajectoryRoute(track);
+    const signature=()=>JSON.stringify([routeKey,track.exitFlightLevel,track.plannedEntryLevel,
+      track.expectedCruiseLevel,track.sectorExitLevels,track.coordinationRevision,physical,c.hasEntered,
+      c.activeSector,c.computerTargetLevel]);
+    const old=cache.get(track);
+    const refreshTrajectory=()=>{
+      track.trajectory=buildTrajectory(track,index);
+      cache.set(track,{index,signature:signature(),time:c.time,position:{lon:track.lon,lat:track.lat},level:track.actualFlightLevel});
+      track.labelRevision=(track.labelRevision || 0)+1;
+    };
+    if(!old || old.index!==index || old.signature!==signature() || c.time-old.time>=5
+      || distanceNm(old.position,track)>=0.5 || Math.abs(old.level-track.actualFlightLevel)>=1)refreshTrajectory();
+    const active=track.trajectory.sequence[0]?.sector ?? physical;
+    if(active!==c.activeSector){
+      const previousActive=c.activeSector;
+      c.activeSector=active;c.visit++;c.retainPhysicalVisit=true;
+      if(active===controlled){c.hasEntered=true;c.enteredAt=c.time;c.owner=controlled;c.sentTo=null;}
+      else if(previousActive===controlled || c.owner===previousActive){c.owner=active;c.sentTo=null;}
+      track.labelRevision=(track.labelRevision || 0)+1;
+    }
+    // Omitted physical visits neither take ownership nor issue clearances.
+    if(active!==controlled && active!=='UNKNOWN' && c.owner!==controlled && c.computerSector!==active){
+      c.computerSector=active;
+      c.computerTargetLevel=sectorTargetLevel(track,active,track.clearedFlightLevel ?? track.actualFlightLevel,!c.hasEntered);
       assignClearedLevel(track,c.computerTargetLevel);
     }
-    if(physical===controlled){c.computerSector=null;c.computerTargetLevel=null;}
-    advanceProposals(track);
-    const routeKey=trajectoryRoute(track);
-    const signature=JSON.stringify([routeKey,track.exitFlightLevel,track.plannedEntryLevel,
-      track.expectedCruiseLevel,track.sectorExitLevels,track.coordinationRevision,physical,c.hasEntered]);
-    const old=cache.get(track);
-    if(!old || old.index!==index || old.signature!==signature || c.time-old.time>=5
-      || distanceNm(old.position,track)>=0.5 || Math.abs(old.level-track.actualFlightLevel)>=1){
-      track.trajectory=buildTrajectory(track,index);
-      cache.set(track,{index,signature,time:c.time,position:{lon:track.lon,lat:track.lat},level:track.actualFlightLevel});
-      track.labelRevision=(track.labelRevision || 0)+1;
-    }
+    if(active===controlled){c.computerSector=null;c.computerTargetLevel=null;}
+    // Keep the profile consistent with a just-entered meaningful sector's
+    // computer clearance immediately, rather than waiting for the cache age.
+    if(cache.get(track).signature!==signature())refreshTrajectory();
     const visits=track.trajectory.sequence;
     const travelled=old && old===cache.get(track) ? distanceNm(old.position,track) : 0;
-    if(physical===controlled){
+    if(active===controlled){
       const next=visits[0]?.sector===controlled ? visits[1] : null;
       if(next && next.sector!=='UNKNOWN' && next.entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM && c.time-c.enteredAt>=3){
         c.owner=next.sector;c.sentTo=next.sector;
@@ -66,7 +83,7 @@ export function updateTrafficControl(state,seconds=0){
       if(entry===1 && visits[entry].entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM){
         c.owner=controlled;
       }else if(c.owner===controlled && entry===-1){
-        c.owner=physical;
+        c.owner=active;
       }
     }
     // A transfer invalidates outstanding proposals to the previous owner.

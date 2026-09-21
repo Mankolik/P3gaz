@@ -18,10 +18,11 @@ function applyInstruction(track,kind,value){
   else if(kind==='vertical')assignVerticalRate(track,value);
   else if(kind==='plannedEntryLevel'){
     track.plannedEntryLevel=value;
-    if(track.control && track.control.physical!==track.control.sector){
+    const active=track.control?.activeSector ?? track.control?.physical;
+    if(track.control && active!==track.control.sector){
       const visits=track.trajectory?.sequence || [];
       const entry=visits.findIndex(v=>v.sector===track.control.sector);
-      const previous=entry>0 ? visits[entry-1].sector : track.control.physical;
+      const previous=entry>0 ? visits[entry-1].sector : active;
       track.sectorExitLevels={...track.sectorExitLevels,[previous]:value};
       // The simulated neighbouring controller issues its own matching CFL.
       const fallback=track.isDeparture ? track.expectedCruiseLevel : track.actualFlightLevel;
