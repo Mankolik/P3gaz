@@ -48,7 +48,8 @@ test('phase boundaries select initial, IAS and Mach climb, cruise, descent and a
 test('unassigned departure IAS converges to the type target without becoming a manual command',()=>{
   for(const type of Object.keys(AIRCRAFT_PERFORMANCE)){
     const t=track(type);advance(t,15);
-    close(t.groundSpeed,convertIasToTas(aircraftPerformance(type).initialClimb.speed.value,1000));
+    const p=aircraftPerformance(type);
+    close(t.groundSpeed,convertIasToTas(Math.max(p.initialClimb.speed.value,p.minimumCleanSpeedKnots-25),1000));
     assert.equal(t.assignedSpeed.value,null);assert.equal(t.actualFlightLevel,10);assert.equal(t.verticalSpeed,0);
   }
 });
@@ -75,11 +76,11 @@ test('profile changes at altitude boundaries and reaches a clearance without ove
   close(t.groundSpeed,convertIasToTas(250,9500));
 });
 
-test('manual IAS/Mach overrides the schedule and clearing resumes automatic speed',()=>{
+test('IAS waits above conversion; Mach respects cruise bounds and clearing resumes baseline',()=>{
   const t=track('A320',300);t.assignedSpeed={mode:'IAS',value:230};advance(t,120);
-  close(t.groundSpeed,convertIasToTas(230,30000));
+  close(t.groundSpeed,convertMachToTas(0.79,30000));
   t.assignedSpeed={mode:'Mach',value:0.7};advance(t,120);
-  close(t.groundSpeed,convertMachToTas(0.7,30000));
+  close(t.groundSpeed,convertMachToTas(0.74,30000));
   t.assignedSpeed={mode:'Mach',value:null};advance(t,120);
   close(t.groundSpeed,convertMachToTas(0.79,30000));assert.equal(t.assignedSpeed.value,null);
 });

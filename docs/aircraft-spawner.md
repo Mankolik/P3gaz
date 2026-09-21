@@ -36,6 +36,10 @@ The generated level supplies `expectedCruiseLevel` (the ECL label field), PEL, a
 
 An empty XFL appears as a blank, always-visible box using the label controls' 1px `currentColor` outline. Filling XFL removes the persistent outline and restores normal behavior: matching CFL values hide until hovering/focusing the levels, and different values stay visible. Clearing XFL restores the empty box. Column geometry stays fixed, and ECL edits leave XFL intact.
 
+The empty XFL picker opens around ECL; a filled XFL picker opens around its assigned value. CFL opens around XFL when set, otherwise around CFL. Scrolling does not select or assign the reference level, and the current clearance remains highlighted even when outside the initial scroll area.
+
+Heading, speed and rate manual inputs open blank. Enter with no value clears the restriction, as does **Clear**. Clearing H removes its label value but retains the last heading target, including completion of an ongoing turn. A new heading or direct-to/route instruction replaces that hold. Clearing an already empty H does not cancel point/route navigation. Clearing S/R returns to the performance baseline and clears any R unable indication.
+
 ## Entry and route following
 
 The spawner expands the route before selecting a position. It tests intersections with the EPWW FIR polygon, including legs whose endpoints are both outside, handles holes and multipolygon parts, and finds the first entry. It then selects the second route fix strictly before entry and starts navigation at the following point. Fewer than two usable preceding fixes means the variant is unavailable.
@@ -67,7 +71,11 @@ The user-supplied `assets/sources/aircraft-performance.txt` defines all 23 avail
 | Descent | Above FL100 through FL240 | Type descent IAS and RoD |
 | Approach | FL100 and below while descending | Type approach IAS and RoD |
 
-Lower level-offs retain the relevant climb or descent/approach speed; they do not automatically climb through a clearance. Speeds use the simulator's existing altitude-aware IAS/TAS and Mach/TAS conversions and 5 kt/s acceleration model. The supplied cruise TAS and Mach are not always equivalent, so Mach drives automatic cruise while nominal TAS remains reference data. Manual IAS or Mach instructions take priority; **Clear** restores the automatic schedule without writing an assigned speed into the label.
+Lower level-offs retain the relevant climb or descent/approach speed; they do not automatically climb through a clearance. Speeds use the simulator's existing altitude-aware IAS/TAS and Mach/TAS conversions and 5 kt/s acceleration model. The supplied cruise TAS and Mach are not always equivalent, so Mach drives automatic cruise while nominal TAS remains reference data.
+
+Speed mode uses a fixed **FL240 conversion level**, matching the supplied phase schedule, rather than calculating an IAS/Mach crossover. Below FL240 the aircraft uses IAS; at and above FL240 it uses Mach, consistently in climb, descent and level flight. An opposite-mode instruction remains recorded but waits until the aircraft enters its mode. Until then the aircraft holds its automatic phase speed: for example, an IAS restriction above FL240 leaves the baseline Mach active. Clearing the restriction restores the automatic schedule. Switching tabs in the speed picker only browses the other mode and does not cancel an existing instruction.
+
+Mach selections are bounded only by the type's cruise Mach minus 0.05 and plus 0.01; the picker and manual entry share these limits. MCS does not constrain Mach flight, including at FL430. Below conversion, the absolute IAS minimum is **MCS minus 25 kt**, allowing lower approach speeds. This floor applies to assigned and automatic IAS targets. Departures still spawn at IAS180 and then accelerate toward a target no lower than MCS minus 25 kt; acceleration remains gradual. An IAS restriction entered above conversion is bounded for later use but remains inactive until the aircraft descends below FL240.
 
 RoC/RoD are phase **baselines**. Without a rate command, the aircraft aims for that baseline. Explicit climb requests can reach 110% of the current baseline; lower requests are honoured. For example, a 1,000 ft/min request against an 800 ft/min climb baseline targets 880 ft/min. Descent requests can be higher or lower without a performance-table cap. Manual rate entry and label normalization do not silently clip values at the former 4,000/6,000 ft/min limits; the preset list remains a convenience. “Or greater” and “or less” compare the requested magnitude with the baseline, then apply the climb allowance if climbing. Clearing a rate command restores the baseline.
 
@@ -79,7 +87,7 @@ CFL requests above the type ceiling are rejected, whether selected from a preset
 
 A new exact or “or greater” climb-rate request **strictly above 130%** of the current altitude band's baseline turns **R orange**. The requested rate stays recorded, while movement still targets no more than **110%** of baseline with the existing gradual transition. Exactly 130% does not produce “unable”. “Or less” is an upper bound, so a high bound is achievable at baseline and is not rejected. Descents remain unrestricted. CFL determines climb/descent direction; while level, a positive rate request is checked against the climb baseline for that altitude. The response is evaluated when the rate instruction is issued, not regenerated each tick, and remains until the rate is replaced or cleared. CFL and R responses clear independently.
 
-Range and minimum clean speed (MCS) are retained as reference fields. There is no fuel/range or flap-configuration model; MCS is not applied as a blanket speed floor because the supplied initial-climb and approach speeds can be below it. Unknown ad hoc types retain generic movement, while the route spawner requires a profile for every configured type.
+Range remains a reference field; there is no fuel/range or flap-configuration model. Unknown ad hoc types retain generic movement, while the route spawner requires a profile for every configured type.
 
 ## Route coverage and diagnostics
 

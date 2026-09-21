@@ -1,4 +1,5 @@
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
+import { effectiveSpeedInstruction } from './speed-control.js';
 import { navigationTarget, navigationHeading, passedNavigationPoint, completeNavigationPoint } from './routes.js';
 import { aircraftPerformance, aircraftCeiling, performanceSchedule } from './performance.js';
 import { requestedVerticalRate, PERFORMANCE_RATE_CHANGE_FPM_PER_SECOND } from './vertical-rate.js';
@@ -160,7 +161,8 @@ function updateHeading(track, currentHeading, dtSeconds, navigationHeading=null)
   if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
     return currentHeading;
   }
-  const target = navigationHeading ?? (Number.isFinite(track?.assignedHeading) ? normalizeHeading(track.assignedHeading) : null);
+  const heldHeading = track?.assignedHeading ?? track?.heldHeading;
+  const target = navigationHeading ?? (Number.isFinite(heldHeading) ? normalizeHeading(heldHeading) : null);
   if(target==null){
     return currentHeading;
   }
@@ -185,9 +187,8 @@ function shortestHeadingDelta(current, target){
 
 function updateGroundSpeed(track, dtSeconds, heading, performance){
   const currentSpeed = Number.isFinite(track?.groundSpeed) ? Math.max(track.groundSpeed, 0) : 0;
-  // Automatic speeds are targets, never ATC assignments. Clearing a manual
-  // IAS/Mach instruction immediately resumes the current type/phase schedule.
-  const assigned = Number.isFinite(track?.assignedSpeed?.value) ? track.assignedSpeed : performance?.speed;
+  // Opposite-mode restrictions wait until crossing the conversion level.
+  const assigned = effectiveSpeedInstruction(track, performance);
   const target = calculateTargetGroundSpeed(track, assigned, heading);
   if(target==null || !Number.isFinite(target)){
     return currentSpeed;
