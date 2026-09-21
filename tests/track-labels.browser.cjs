@@ -194,6 +194,17 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await performancePage.locator('.track-picker input').fill('2000');await performancePage.keyboard.press('Enter');
     await performancePage.evaluate(()=>{window.labelTest.advance(2);window.labelTest.render();});
     assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].verticalSpeed),1100);
+    await performancePage.waitForFunction(()=>getComputedStyle(document.querySelector('.track-label .assigned-vertical')).color==='rgb(255, 146, 89)');
+    assert.match(await performanceLabel.locator('.assigned-vertical').getAttribute('title'),/Unable/);
+    await performanceLabel.locator('.assigned-vertical').click();
+    await performancePage.locator('.track-picker input').fill('1300');await performancePage.keyboard.press('Enter');
+    assert.equal(await performanceLabel.locator('.assigned-vertical.is-unable').count(),0,'130% is allowed without unable');
+    await performanceLabel.locator('.assigned-vertical').click();
+    await performancePage.locator('.track-picker__option[data-value="2000"]').click();
+    assert.equal(await performanceLabel.locator('.assigned-vertical.is-unable').count(),1,'preset reports unable');
+    await performanceLabel.locator('.assigned-vertical').click();
+    await performancePage.locator('.track-picker__clear').click();
+    assert.equal(await performanceLabel.locator('.assigned-vertical.is-unable').count(),0,'clear removes rate response');
     await performancePage.evaluate(()=>{
       Object.assign(window.labelTest.tracks[0],{aircraftType:'B77W',actualFlightLevel:400,clearedFlightLevel:100,
         verticalSpeed:-1000,assignedVertical:null,verticalRateAssigned:false});window.labelTest.render();
@@ -201,6 +212,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await performanceLabel.locator('.assigned-vertical').click();
     await performancePage.locator('.track-picker input').fill('-7000');await performancePage.keyboard.press('Enter');
     assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].assignedVertical.value),-7000);
+    assert.equal(await performanceLabel.locator('.assigned-vertical.is-unable').count(),0);
     await performancePage.evaluate(()=>{window.labelTest.advance(120);window.labelTest.render();});
     assert.equal(await performancePage.evaluate(()=>window.labelTest.tracks[0].verticalSpeed),-7000);
     await performancePage.close();
@@ -235,7 +247,7 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       assert.equal(await list.locator('.selected').count(), exact ? 1 : 0, 'nearest preset must not replace manual selection');
       if(selector.includes('level-') || selector === '.assigned-ecl'){
         const values = await list.locator('[data-value]').evaluateAll(options=>options.map(option=>Number(option.dataset.value)));
-        assert.equal(values[0], 390, 'A21N level options stop at its ceiling');
+        assert.equal(values[0], selector==='.level-primary button'?600:390, 'CFL allows requests above ceiling; other levels remain bounded');
         assert.equal(values.at(-1), 0);
         assert(values.every((value,i)=>i === 0 || value < values[i-1]), 'levels descend');
       }
@@ -262,9 +274,27 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290);
     await first.locator('.level-primary button').click();
-    assert.equal(await page.locator('.track-picker input').getAttribute('max'),'390');
+    assert.equal(await page.locator('.track-picker input').getAttribute('max'),'600');
     await page.keyboard.type('450');await page.keyboard.press('Enter');
-    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),390,'manual clearance cannot exceed type ceiling');
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290,'unable keeps the last accepted CFL');
+    assert.equal(await primary.textContent(),'290');
+    assert.match(await primary.getAttribute('title'),/Unable FL450; continuing CFL 290/);
+    assert.equal(await primary.evaluate(el=>getComputedStyle(el).color),'rgb(255, 146, 89)');
+    await page.evaluate(()=>{
+      window.labelTest.tracks[0].actualFlightLevel=290;
+      window.labelTest.tracks[0].labelRevision++;window.labelTest.render();
+    });
+    await page.mouse.move(1090,690);
+    await primary.evaluate(el=>el.blur());
+    assert.equal(await primary.evaluate(el=>getComputedStyle(el).opacity),'1','unable remains visible when CFL matches AFL');
+    await primary.click();await page.locator('.track-picker__option[data-value="400"]').click();
+    assert.equal(await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel),290,'preset rejects too-high CFL too');
+    await primary.click();await page.locator('.track-picker__option[data-value="290"]').click();
+    assert.equal(await first.locator('.level-primary.is-unable').count(),0,'valid reissued CFL clears unable');
+    await primary.click();await page.locator('.track-picker__option[data-value="400"]').click();
+    await primary.click();await page.locator('.track-picker__clear').click();
+    assert.equal(await first.locator('.level-primary.is-unable').count(),0,'clear removes unable');
+    console.log('PASS: orange unable CFL retains accepted level, stays visible at level flight, and resets on valid/cleared instructions');
 
     // Direct-to works with the real navigation catalog and no flight plan.
     assert.equal(await first.locator('.row3 > *').count(),3,'reuse the existing point field without adding a label column');
