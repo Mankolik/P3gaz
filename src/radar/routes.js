@@ -44,14 +44,20 @@ export function setFlightPlan(track, waypoints, nextIndex=0){
   track.navigationIntercept = null;
   track.navigationMode = 'route';
   track.assignedHeading = null;
+  track.heldHeading = null;
   changed(track);
 }
 
 export function assignHeading(track, heading=null){
+  // Clearing an already empty H must not cancel an active point/route.
+  if(!Number.isFinite(heading) && !Number.isFinite(track.assignedHeading)
+    && (track.navigationMode==='route' || track.navigationMode==='direct')) return;
+  const previous = track.assignedHeading ?? track.heldHeading ?? track.heading;
   track.directTo = null;
   track.navigationIntercept = null;
   track.navigationMode = 'heading';
   track.assignedHeading = Number.isFinite(heading) ? normalize(heading) : null;
+  track.heldHeading = Number.isFinite(heading) ? null : previous;
   changed(track);
 }
 
@@ -74,6 +80,7 @@ export function assignDirectTo(track, point, {planIndex=null,rejoinIndex=null}={
   track.navigationIntercept = null;
   track.navigationMode = 'direct';
   track.assignedHeading = null;
+  track.heldHeading = null;
   changed(track);
 }
 
@@ -147,5 +154,6 @@ export function completeNavigationPoint(track){
   if(track.navigationMode === 'route' && !navigationTarget(track)) track.navigationMode = 'heading';
   // Keep the arrival heading; an earlier heading clearance must not return.
   track.assignedHeading = null;
+  track.heldHeading = null;
   changed(track);
 }

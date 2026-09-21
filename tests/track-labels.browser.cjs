@@ -218,6 +218,67 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await performancePage.close();
     console.log('PASS: UI rate commands allow 110% climb and uncapped manual descent');
 
+    const controlPage=await browser.newPage({viewport:{width:1100,height:700}});
+    controlPage.on('pageerror',error=>errors.push(error.message));
+    await controlPage.goto(origin+'/fixture');await controlPage.waitForFunction(()=>window.labelTest?.tracks.length);
+    const controlLabel=controlPage.locator('.track-label').first();
+    await controlPage.evaluate(()=>{
+      Object.assign(window.labelTest.tracks[0],{aircraftType:'A320',heading:90,assignedHeading:180,
+        actualFlightLevel:300,clearedFlightLevel:350,verticalSpeed:1000,assignedSpeed:null});
+      window.labelTest.render();
+    });
+    await controlLabel.hover();await controlLabel.locator('.assigned-heading').click();
+    assert.equal(await controlPage.locator('.track-picker input').inputValue(),'');
+    await controlPage.keyboard.press('Enter');
+    assert.equal(await controlLabel.locator('.assigned-heading').textContent(),'h');
+    await controlPage.evaluate(()=>{window.labelTest.advance(40);window.labelTest.render();});
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].heading),180,'clearing H completes the assigned turn');
+
+    await controlLabel.locator('.assigned-vertical').click();
+    await controlPage.locator('.track-picker input').fill('2000');await controlPage.keyboard.press('Enter');
+    assert.equal(await controlLabel.locator('.assigned-vertical.is-unable').count(),1);
+    await controlLabel.locator('.assigned-vertical').click();await controlPage.keyboard.press('Enter');
+    assert.equal(await controlLabel.locator('.assigned-vertical').textContent(),'r');
+    assert.equal(await controlLabel.locator('.assigned-vertical.is-unable').count(),0);
+    await controlPage.evaluate(()=>{window.labelTest.advance(5);window.labelTest.render();});
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].verticalSpeed),1000,'blank R restores baseline');
+
+    await controlLabel.locator('.assigned-speed').click();
+    assert.equal(await controlPage.locator('.track-picker input').getAttribute('min'),'0.74');
+    assert.equal(await controlPage.locator('.track-picker input').getAttribute('max'),'0.8');
+    assert.deepEqual(await controlPage.locator('.track-picker__option').evaluateAll(nodes=>nodes.map(n=>Number(n.dataset.value))),[0.74,0.75,0.76,0.77,0.78,0.79,0.8]);
+    await controlPage.locator('.track-picker input').fill('0.90');await controlPage.keyboard.press('Enter');
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].assignedSpeed.value),0.8,'manual Mach respects type cap');
+    await controlLabel.locator('.assigned-speed').click();await controlPage.keyboard.press('Enter');
+    assert.equal(await controlLabel.locator('.assigned-speed').textContent(),'s');
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].assignedSpeed.value),null);
+
+    await controlPage.evaluate(()=>{
+      const t=window.labelTest.tracks[0];Object.assign(t,{actualFlightLevel:180,clearedFlightLevel:180});
+      t.labelRevision++;window.labelTest.render();
+    });
+    await controlLabel.locator('.assigned-speed').click();
+    assert.equal(await controlPage.locator('.track-picker input').getAttribute('min'),'185');
+    await controlPage.locator('.track-picker input').fill('100');await controlPage.keyboard.press('Enter');
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].assignedSpeed.value),185);
+    await controlLabel.locator('.assigned-speed').click();
+    await controlPage.locator('.track-picker__mode-toggle button').filter({hasText:'MN'}).click();
+    await controlPage.waitForFunction(()=>document.querySelector('.track-picker input')?.step==='0.01');
+    await controlPage.keyboard.press('Escape');
+    assert.deepEqual(await controlPage.evaluate(()=>window.labelTest.tracks[0].assignedSpeed),{mode:'IAS',value:185},'browsing another mode does not cancel a restriction');
+    await controlLabel.locator('.assigned-speed').click();
+    await controlPage.locator('.track-picker__mode-toggle button').filter({hasText:'MN'}).click();
+    await controlPage.waitForFunction(()=>document.querySelector('.track-picker input')?.step==='0.01');
+    await controlPage.locator('.track-picker input').fill('0.76');await controlPage.keyboard.press('Enter');
+    await controlPage.evaluate(()=>{window.labelTest.advance(120);window.labelTest.render();});
+    assert.deepEqual(await controlPage.evaluate(()=>window.labelTest.tracks[0].assignedSpeed),{mode:'Mach',value:0.76},'opposite-mode request stays recorded');
+    const heldSpeed=await controlPage.evaluate(()=>window.labelTest.tracks[0].groundSpeed);
+    await controlLabel.locator('.assigned-speed').click();await controlPage.keyboard.press('Enter');
+    await controlPage.evaluate(()=>{window.labelTest.advance(30);window.labelTest.render();});
+    assert.equal(await controlPage.evaluate(()=>window.labelTest.tracks[0].groundSpeed),heldSpeed,'waiting Mach and cleared speed both use low-cruise IAS baseline');
+    await controlPage.close();
+    console.log('PASS: blank Enter clears H/S/R, heading hold survives, rate baseline returns, and speed picker enforces limits without mode-toggle side effects');
+
     // Open around the assignment, including manual values between presets.
     for(const [selector, assignments, nearest, exact] of [
       ['.assigned-heading', {assignedHeading:180}, 180, true],
@@ -227,8 +288,8 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       ['.assigned-speed', {assignedSpeed:{mode:'Mach',value:0.78}}, 0.78, true],
       ['.assigned-vertical', {assignedVertical:{value:-1500,comparator:'exact'},verticalRateAssigned:true}, -1500, true],
       ['.assigned-vertical', {assignedVertical:{value:0,comparator:'exact'},verticalRateAssigned:true}, 0, true],
-      ['.level-primary button', {clearedFlightLevel:380}, 380, true],
-      ['.level-primary button', {clearedFlightLevel:275}, 280, false],
+      ['.level-primary button', {clearedFlightLevel:380,exitFlightLevel:null}, 380, true],
+      ['.level-primary button', {clearedFlightLevel:275,exitFlightLevel:null}, 280, false],
       ['.level-exit button', {exitFlightLevel:390}, 390, true],
       ['.level-exit button', {exitFlightLevel:0}, 0, true],
       ['.assigned-ecl', {expectedCruiseLevel:350}, 350, true],
@@ -253,14 +314,27 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       }
       await page.keyboard.press('Escape');
     }
-    // An unassigned level starts at the highest preset rather than stale scroll.
+    // Empty XFL opens at ECL, while filled XFL opens at its own value.
     await first.locator('.level-exit button').click();
     await page.locator('.track-picker__clear').click();
     await first.locator('.level-exit button').click();
-    assert.equal(await page.locator('.track-picker__options').evaluate(el=>el.scrollTop), 0);
+    assert.equal(await page.locator('.track-picker__options').getAttribute('data-scroll-value'), '350');
+    const eclOption=await page.locator('.track-picker__option[data-value="350"]').boundingBox();
+    const eclList=await page.locator('.track-picker__options').boundingBox();
+    assert(eclOption.y>=eclList.y && eclOption.y+eclOption.height<=eclList.y+eclList.height);
     assert.equal(await page.locator('.track-picker__option.selected').count(), 0);
+    await page.locator('.track-picker__option[data-value="200"]').click();
+    await first.locator('.level-exit button').click();
+    assert.equal(await page.locator('.track-picker__options').getAttribute('data-scroll-value'),'200');
     await page.keyboard.press('Escape');
-    console.log('PASS: pickers open at exact or nearest assignments, levels descend, and empty assignments start at the top');
+    await first.locator('.level-primary button').click();
+    assert.equal(await page.locator('.track-picker__options').getAttribute('data-scroll-value'),'200');
+    const xflOption=await page.locator('.track-picker__option[data-value="200"]').boundingBox();
+    const cflList=await page.locator('.track-picker__options').boundingBox();
+    assert(xflOption.y>=cflList.y && xflOption.y+xflOption.height<=cflList.y+cflList.height,'CFL opens around XFL even with a different selected CFL');
+    assert.equal(await page.locator('.track-picker input').inputValue(),'275','scroll target never changes the clearance');
+    await page.keyboard.press('Escape');
+    console.log('PASS: empty XFL opens at ECL, filled XFL at itself, and CFL prefers XFL with CFL fallback');
 
     // Focused level entry supports typing/Enter and cancelling without blur commits.
     const oldLevel=await page.evaluate(()=>window.labelTest.tracks[0].clearedFlightLevel);

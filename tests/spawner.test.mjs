@@ -199,7 +199,8 @@ test('airport departures start at FL010 / IAS180 and adopt type speed while hold
     assert.equal(t.assignedSpeed.value,null);
     const location=[t.lon,t.lat];updateTrackMovement(s,60);
     assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,10);
-    assert.equal(t.groundSpeed,convertIasToTas(aircraftPerformance(t.aircraftType).initialClimb.speed.value,1000));
+    const profile=aircraftPerformance(t.aircraftType);
+    assert.equal(t.groundSpeed,convertIasToTas(Math.max(profile.initialClimb.speed.value,profile.minimumCleanSpeedKnots-25),1000));
     t.clearedFlightLevel=100;updateTrackMovement(s,10);
     assert(t.actualFlightLevel>10);
   }

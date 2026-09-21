@@ -4,6 +4,7 @@ import { assignHeading, navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 import { aircraftCeiling } from '../radar/performance.js';
 import { assignClearedLevel, assignVerticalRate } from '../radar/clearances.js';
+import { limitSpeedInstruction, speedLimits, speedMode } from '../radar/speed-control.js';
 
 const STATUS_COLORS = {
   default: '#bfbfbf',
@@ -938,13 +939,13 @@ function positionTrackPicker(panel, anchor){
 
 function scrollPickerToCurrentValue(panel){
   for(const list of panel.querySelectorAll('.track-picker__options')){
-    const rawCurrent = list.dataset.currentValue;
+    const rawCurrent = list.dataset.scrollValue ?? list.dataset.currentValue;
     if(rawCurrent == null || rawCurrent === '') continue;
     const current = Number(rawCurrent);
     if(!Number.isFinite(current)) continue;
     // Manual entries may fall between presets: show that range without
     // marking a different value as the selected assignment.
-    let target = list.querySelector('.selected');
+    let target = list.dataset.scrollValue!=null ? null : list.querySelector('.selected');
     if(!target){
       let nearestDistance = Infinity;
       for(const option of list.querySelectorAll('[data-value]')){
@@ -988,6 +989,11 @@ function createManualInput(options){
   }
   container.appendChild(input);
   const handleSubmit = ()=>{
+    if(!input.value.trim() && typeof onClear === 'function'){
+      onClear();
+      if(typeof close === 'function') close();
+      return;
+    }
     if(typeof onSubmit !== 'function'){
       if(typeof close === 'function') close();
       return;
@@ -1057,7 +1063,7 @@ function openHeadingPicker(node, anchor){
       min: 0,
       max: 359,
       step: 1,
-      defaultValue: Number.isFinite(track.assignedHeading) ? String(Math.round(((track.assignedHeading % 360) + 360) % 360)) : '',
+      defaultValue: '',
       onSubmit: raw=>{
         const parsed = parseInt(raw, 10);
         if(!Number.isFinite(parsed)) return false;
@@ -1078,12 +1084,13 @@ function openHeadingPicker(node, anchor){
   });
 }
 
-function openSpeedPicker(node, anchor){
+function openSpeedPicker(node, anchor, requestedMode=null){
   if(!node || !anchor || !node.track) return;
   const track = node.track;
   const assignment = normalizeSpeedAssignment(track);
-  const mode = assignment.mode === 'Mach' ? 'Mach' : 'IAS';
-  const selectedValue = Number.isFinite(assignment.value) ? assignment.value : null;
+  const mode = requestedMode || (Number.isFinite(assignment.value) ? assignment.mode : speedMode(track));
+  const limits = speedLimits(track, mode);
+  const selectedValue = assignment.mode===mode && Number.isFinite(assignment.value) ? assignment.value : null;
   showTrackPicker(node, anchor, 'track-picker--speed', (panel, close)=>{
     panel.dataset.type = 'speed';
     const modes = document.createElement('div');
@@ -1103,28 +1110,23 @@ function openSpeedPicker(node, anchor){
       evt.preventDefault();
       evt.stopPropagation();
       if(mode === 'IAS') return;
-      track.assignedSpeed = { mode: 'IAS', value: null };
-      track.labelRevision = (track.labelRevision || 0) + 1;
-      updateLabelNode(node, track);
       close();
-      requestAnimationFrame(()=>openSpeedPicker(node, anchor));
+      requestAnimationFrame(()=>openSpeedPicker(node, anchor, 'IAS'));
     });
     machBtn.addEventListener('click', evt=>{
       evt.preventDefault();
       evt.stopPropagation();
       if(mode === 'Mach') return;
-      track.assignedSpeed = { mode: 'Mach', value: null };
-      track.labelRevision = (track.labelRevision || 0) + 1;
-      updateLabelNode(node, track);
       close();
-      requestAnimationFrame(()=>openSpeedPicker(node, anchor));
+      requestAnimationFrame(()=>openSpeedPicker(node, anchor, 'Mach'));
     });
     modes.append(iasBtn, machBtn);
     panel.appendChild(modes);
 
     const list = document.createElement('div');
     list.className = 'track-picker__options';
-    const values = mode === 'Mach' ? MACH_SPEED_OPTIONS : IAS_SPEED_OPTIONS;
+    const presets = mode === 'Mach' ? MACH_SPEED_OPTIONS : IAS_SPEED_OPTIONS;
+    const values = [...new Set([limits.min,...presets,limits.max])].filter(value=>value>=limits.min && value<=limits.max).sort((a,b)=>a-b);
     list.dataset.currentValue = selectedValue ?? '';
     values.forEach(value=>{
       const label = mode === 'Mach' ? value.toFixed(MACH_LABEL_PRECISION) : String(value);
@@ -1135,7 +1137,7 @@ function openSpeedPicker(node, anchor){
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
-        track.assignedSpeed = { mode, value: mode === 'Mach' ? Number(value.toFixed(MACH_LABEL_PRECISION)) : value };
+        track.assignedSpeed = limitSpeedInstruction(track, { mode, value: mode === 'Mach' ? Number(value.toFixed(MACH_LABEL_PRECISION)) : value });
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         close();
@@ -1148,11 +1150,9 @@ function openSpeedPicker(node, anchor){
       placeholder: mode === 'Mach' ? '0.78' : '250',
       type: 'number',
       step: mode === 'Mach' ? '0.01' : '10',
-      min: mode === 'Mach' ? MACH_SPEED_MIN : IAS_SPEED_MIN,
-      max: mode === 'Mach' ? MACH_SPEED_MAX : IAS_SPEED_MAX,
-      defaultValue: selectedValue!=null
-        ? (mode === 'Mach' ? selectedValue.toFixed(MACH_LABEL_PRECISION) : String(selectedValue))
-        : '',
+      min: limits.min,
+      max: limits.max,
+      defaultValue: '',
       onSubmit: raw=>{
         if(mode === 'Mach'){
           let parsed = parseFloat(raw);
@@ -1167,6 +1167,7 @@ function openSpeedPicker(node, anchor){
           parsed = Math.min(Math.max(parsed, IAS_SPEED_MIN), IAS_SPEED_MAX);
           track.assignedSpeed = { mode, value: parsed };
         }
+        track.assignedSpeed = limitSpeedInstruction(track, track.assignedSpeed);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         return true;
@@ -1249,7 +1250,7 @@ function openVerticalPicker(node, anchor){
       placeholder: 'FPM',
       type: 'number',
       step: '100',
-      defaultValue: selectedValue!=null ? String(selectedValue) : '',
+      defaultValue: '',
       onSubmit: raw=>{
         const parsed = parseInt(raw, 10);
         if(!Number.isFinite(parsed)) return false;
@@ -1324,6 +1325,9 @@ function createLevelEditor(field, track, node, close, options){
   const refresh = ()=>{
     const current = getTrackLevelValue(track, field.key);
     list.dataset.currentValue = current ?? '';
+    const scrollLevel = isCfl ? (getTrackLevelValue(track, 'exitFlightLevel') ?? current)
+      : field.key==='exitFlightLevel' ? (current ?? getTrackLevelValue(track, 'expectedCruiseLevel')) : current;
+    list.dataset.scrollValue = scrollLevel ?? '';
     const buttons = list.querySelectorAll('.track-picker__option');
     buttons.forEach(btn=>{
       const value = Number.parseInt(btn.dataset.value || '', 10);
