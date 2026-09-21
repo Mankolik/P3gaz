@@ -16,7 +16,7 @@ export function mountSpawnButton(root,state,bus) {
   const ready=()=>{
     button.disabled=!state.air.spawner;
     const count=state.air.spawner?.catalogue.groups.length;
-    button.title=count?`Spawn accepted aircraft from ${count} airport pairs`:state.air.spawnError||'Loading traffic routes…';
+    button.title=count?`Spawn aircraft from ${count} airport pairs`:state.air.spawnError||'Loading traffic routes…';
     if(state.air.spawnError)notify('Aircraft spawner unavailable: '+state.air.spawnError);
   };
   bus.on('spawner:ready',ready);ready();

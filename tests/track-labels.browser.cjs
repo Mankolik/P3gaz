@@ -493,7 +493,9 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'WZZ1891');
     await page.mouse.move(1090,690);
     assert.equal(await sectorPanel.locator('.sector-panel__callsign').textContent(),'WZZ1891');
-    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW E HIGH/);
+    assert.equal(await sectorPanel.getAttribute('aria-label'),'Sector sequence');
+    assert.equal(await sectorPanel.locator('.sector-panel__header').textContent(),'Sector sequence');
+    assert.match(await sectorPanel.locator('.sector-panel__sequence').textContent(),/^ALLFIR/);
     const panelBeforeDrag = await sectorPanel.boundingBox();
     const panelHeader = await sectorPanel.locator('.sector-panel__header').boundingBox();
     await page.mouse.move(panelHeader.x+30,panelHeader.y+12);
@@ -509,14 +511,14 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       track.actualFlightLevel=360;
       track.clearedFlightLevel=360;
     });
-    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
-    // The same last-hovered track follows the rebuilt Krakow vertical stack.
-    for(const [level,name,limits] of [
-      [25,'EPKK LTMA','2300 FT AMSL–3500 FT AMSL'],
-      [35,'EPKK LTMA B','3500 FT AMSL–FL095'],
-      [95,'EPKK UTMA A','FL095–FL245'],
-      [245,'EPKK UTMA B','FL245–FL285'],
-      [285,'EPWW J LOW','FL095–FL365'],
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__level').textContent.includes('AFL 360'));
+    // Physical detail stays in the tooltip; the window uses grouped sectors.
+    for(const [level,name,limits,sector] of [
+      [25,'EPKK LTMA','2300 FT AMSL–3500 FT AMSL','APKK'],
+      [35,'EPKK LTMA B','3500 FT AMSL–FL095','APKK'],
+      [95,'EPKK UTMA A','FL095–FL245','APKK'],
+      [245,'EPKK UTMA B','FL245–FL285','APKK'],
+      [285,'EPWW J LOW','FL095–FL365','ALLFIR'],
     ]){
       await page.evaluate(level=>{
         const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
@@ -524,10 +526,12 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
         track.groundSpeed=0; track.assignedSpeed=null;
         track.actualFlightLevel=level; track.clearedFlightLevel=level;
       },level);
-      await page.waitForFunction(({name,limits})=>{
-        const details=document.querySelector('.sector-panel__details').textContent;
-        return details.includes(name) && details.includes(limits);
-      },{name,limits});
+      await page.waitForFunction(({name,limits,sector})=>{
+        const node=document.querySelector('#track-overlay').__trackNodes.get('WZZ1891');
+        const details=node.callsign.title;
+        return details.includes(name) && details.includes(limits) &&
+          document.querySelector('#track-sector-panel').dataset.currentSector===sector;
+      },{name,limits,sector});
     }
     // Return to Warsaw for the existing EPWA checks below.
     await page.evaluate(()=>{
@@ -538,29 +542,32 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
       const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
       track.actualFlightLevel=200; track.clearedFlightLevel=200;
     });
-    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWA TMA A'));
-    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/2000 FT AMSL–FL245/);
-    assert.doesNotMatch(await sectorPanel.locator('.sector-panel__details').textContent(),/EPWW/);
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.currentSector==='APWA');
+    assert.match(await sectorPanel.locator('.sector-panel__sequence').textContent(),/^APWA/);
+    assert.doesNotMatch(await sectorPanel.textContent(),/EPWA TMA A|2000 FT AMSL/);
     await page.evaluate(()=>{
       const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
       track.actualFlightLevel=245; track.clearedFlightLevel=245;
     });
-    await page.waitForFunction(()=>document.querySelector('.sector-panel__details').textContent.includes('EPWW E LOW'));
+    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.currentSector==='ALLFIR');
     await page.evaluate(()=>{
       const track = document.querySelector('#track-overlay').__trackNodes.get('WZZ1891').track;
       track.lon=0; track.lat=0; track.groundSpeed=0; track.assignedSpeed=null;
     });
-    await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.sectorStatus === 'outside');
+    await page.waitForFunction(()=>{
+      const sector=document.querySelector('#track-sector-panel').dataset.currentSector;
+      return sector && sector!=='ALLFIR';
+    });
     const lot = page.locator('.track-label').filter({has:page.locator('.callsign',{hasText:'LOT612'})});
     await lot.hover({force:true});
     await page.waitForFunction(()=>document.querySelector('#track-sector-panel').dataset.trackId === 'LOT612');
-    assert.match(await sectorPanel.locator('.sector-panel__details').textContent(),/EPGD UTMA/);
+    assert.match(await sectorPanel.locator('.sector-panel__sequence').textContent(),/^APGD/);
     await page.setViewportSize({width:800,height:600});
     await page.waitForFunction(()=>{
       const r = document.querySelector('#track-sector-panel').getBoundingClientRect();
       return r.x >= 0 && r.y >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
     });
-    console.log('PASS: last-hovered sector window, dragging, live altitude/position changes, track switching, and resize bounds');
+    console.log('PASS: last-hovered sector sequence window, dragging, live altitude/position changes, grouped sectors, track switching, and resize bounds');
     assert.equal(errors.length,0,errors.join('\n'));
     console.log('PASS: application boots and renders live traffic without JavaScript errors');
     if(process.env.LABEL_SCREENSHOT) await page.screenshot({path:process.env.LABEL_SCREENSHOT});

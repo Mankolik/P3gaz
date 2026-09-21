@@ -1,22 +1,27 @@
-import { sectorLimitsText } from '../../radar/sectors.js';
-
 export function mountSectorPanel(parent, overlay, state){
   const panel = document.createElement('section');
   panel.id = 'track-sector-panel';
   panel.className = 'sector-panel';
-  panel.setAttribute('aria-label', 'Track sector');
+  panel.setAttribute('aria-label', 'Sector sequence');
   const header = document.createElement('div');
   header.className = 'sector-panel__header';
-  header.textContent = 'Track sector';
+  header.textContent = 'Sector sequence';
   header.title = 'Drag to move. Arrow keys move the window when focused.';
   header.tabIndex = 0;
   const callsign = document.createElement('div');
   callsign.className = 'sector-panel__callsign';
   const level = document.createElement('div');
   level.className = 'sector-panel__level';
-  const details = document.createElement('div');
-  details.className = 'sector-panel__details';
-  panel.append(header, callsign, level, details);
+  const trajectory = document.createElement('div');
+  trajectory.className = 'sector-panel__trajectory';
+  const sequenceLine = document.createElement('div');
+  sequenceLine.className = 'sector-panel__sequence';
+  const crossings = document.createElement('div');
+  crossings.className = 'sector-panel__crossings';
+  const message = document.createElement('div');
+  message.className = 'sector-panel__message';
+  trajectory.append(sequenceLine, crossings);
+  panel.append(header, callsign, level, trajectory, message);
   parent.appendChild(panel);
 
   let selectedId = null;
@@ -30,25 +35,32 @@ export function mountSectorPanel(parent, overlay, state){
   };
   const refresh = ()=>{
     const track = state.air.tracks.find(track=>track.id === selectedId);
-    const membership = track?.sectorMembership;
     const name = track?.callsign || (selectedId ? 'Track unavailable' : 'Hover a track label');
     const actualLevel = Number.isFinite(track?.actualFlightLevel)
       ? `AFL ${String(Math.round(track.actualFlightLevel)).padStart(3,'0')}` : '';
-    let description = 'The last hovered track stays selected here.';
-    if(selectedId){
-      if(!membership || membership.status === 'unknown') description = 'Sector information unavailable';
-      else if(membership.status === 'outside') description = 'Outside loaded sector limits';
-      else description = membership.sectors.map(sector=>`${sector.name}\n${sectorLimitsText(sector)}`).join('\n\n');
-      if(membership?.sectors.length > 1) description += '\n\nShared boundary / overlapping sectors';
-    }
-    const display = JSON.stringify([selectedId,name,actualLevel,description]);
+    const prediction=track?.trajectory;
+    const sequence=prediction?.sequence || [];
+    const summary=sequence.map(v=>v.sector).join(' → ');
+    const crossingText=sequence.length ? `Current: ${sequence[0].sector}\n`+
+      (sequence.length>1 ? 'Predicted entry · FL · distance ahead\n'+
+        sequence.slice(1).map(v=>`${v.sector} · FL${String(Math.round(v.entry.level)).padStart(3,'0')} · ${v.entry.distanceNm.toFixed(1)} NM`).join('\n')
+        : 'No further sector crossing on this route.') : '';
+    const status=[!selectedId ? 'The last hovered track stays selected here.'
+      : !track ? 'Hover another track label to see its sequence.'
+      : !sequence.length ? prediction?.reason || 'Sector sequence unavailable.'
+      : !prediction.complete ? prediction.reason || 'Prediction incomplete.' : '',
+      track?.coordinationMessage].filter(Boolean).join('\n');
+    const levelText=[actualLevel,track?.control?.owner ? `Control: ${track.control.owner}` : ''].filter(Boolean).join(' · ');
+    const display = JSON.stringify([selectedId,name,levelText,summary,crossingText,status]);
     if(display === lastDisplay) return;
     lastDisplay = display;
     panel.dataset.trackId = selectedId || '';
-    panel.dataset.sectorStatus = membership?.status || 'unknown';
+    panel.dataset.currentSector = sequence[0]?.sector || '';
     callsign.textContent = name;
-    level.textContent = actualLevel;
-    details.textContent = description;
+    level.textContent = levelText;
+    sequenceLine.textContent = summary;
+    crossings.textContent = crossingText;
+    message.textContent = status;
     place();
   };
   overlay.addEventListener('track-hover', event=>{
@@ -56,7 +68,7 @@ export function mountSectorPanel(parent, overlay, state){
     refresh();
   });
   // Registered after the simulation tick handler, so position/altitude and
-  // membership are already current when the inspector refreshes.
+  // trajectory are already current when the sequence refreshes.
   state.bus.on('tick', refresh);
   state.bus.on('track:sector-changed', ({track})=>{
     if(track.id === selectedId) refresh();

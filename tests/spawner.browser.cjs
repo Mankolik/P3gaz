@@ -123,13 +123,17 @@ bus.emit('spawner:ready');
         const r=el.getBoundingClientRect();return r.left<b.x+b.width&&r.right>b.x&&r.top<b.y+b.height&&r.bottom>b.y;
       }),box);assert.equal(overlaps,false);
     }
-    // Actual application: startup, one click, visible accepted label and keyboard activation.
+    // Actual application: startup, sector-relative labels and keyboard activation.
     await page.setViewportSize({width:1440,height:900});
     await page.goto(origin+'/');await page.waitForFunction(()=>!document.querySelector('.spawn-button')?.disabled);
-    const before=await page.locator('.track-label.status-accepted').count();
-    await button.click();await page.waitForFunction(n=>document.querySelectorAll('.track-label.status-accepted').length===n+1,before);
+    const before=await page.locator('.track-label').count();
+    await button.click();await page.waitForFunction(n=>document.querySelectorAll('.track-label').length===n+1,before);
     await button.focus();await page.keyboard.press('Enter');
-    await page.waitForFunction(n=>document.querySelectorAll('.track-label.status-accepted').length===n+2,before);
+    await page.waitForFunction(n=>document.querySelectorAll('.track-label').length===n+2,before);
+    const spawned=page.locator('.track-label').last();
+    assert.match(await spawned.getAttribute('class'),/status-(accepted|inbound|preinbound|unconcerned|intruder)/);
+    await spawned.dispatchEvent('pointerenter');
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__sequence')?.textContent.length>0);
     if(process.env.SPAWNER_SCREENSHOT)await page.screenshot({path:process.env.SPAWNER_SCREENSHOT});
     assert.deepEqual(errors,[]);
     // Data failures keep the button disabled and explain why.
@@ -147,6 +151,10 @@ bus.emit('spawner:ready');
     await page.goto(origin+'/');await page.waitForFunction(()=>document.querySelector('.spawn-feedback')?.textContent.includes('unavailable'));
     assert.equal(await button.isDisabled(),true);
     assert.match(await page.getByRole('status').innerText(),/navigation files/);
-    console.log('PASS: departure and inbound operator aircraft selection, clearances, accepted labels, keyboard, responsive placement and data failure.');
+    await page.unroute('**/route-point-corrections.geojson');
+    await page.route('**/epby_tma.geojson',route=>route.fulfill({status:404,body:''}));
+    await page.goto(origin+'/');await page.waitForFunction(()=>document.querySelector('.spawn-feedback')?.textContent.includes('unavailable'));
+    assert.equal(await button.isDisabled(),true);assert.match(await page.getByRole('status').innerText(),/airspace volumes/);
+    console.log('PASS: departure/inbound spawning, live trajectory labels and sequence panel, keyboard, responsive placement and data failure.');
   }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

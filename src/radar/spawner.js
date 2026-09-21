@@ -4,6 +4,7 @@ import { updateTrackSectors } from './sectors.js';
 import { aircraftPerformance } from './performance.js';
 import { convertIasToTas, convertMachToTas } from '../utils/speed.js';
 import { requestedCruiseLevel } from './cruise-level.js';
+import { updateTrafficControl } from './traffic-control.js';
 
 const draw=random=>Math.max(0,Math.min(1-Number.EPSILON,random()));
 const choose=(items,random)=>items[Math.floor(draw(random)*items.length)];
@@ -28,7 +29,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const performance=aircraftPerformance(aircraftType);
     const heading=bearingToPoint(position,next);
     // One cruise draw supplies ECL and airborne spawn altitude. Departures
-    // retain FL010 and wait for a higher clearance.
+    // start at FL010; the computer sector subsequently issues their climb CFL.
     const cruiseLevel=requestedCruiseLevel(group,performance,random);
     let id;
     do {id=`spawn-${++sequence}`;} while(state.air.tracks.some(t=>t.id===id));
@@ -46,8 +47,10 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
       sourceLine:variant.sourceLine,sourceFlightLevel:variant.sourceFlightLevel,annotations:variant.annotations,
       omittedPoints:variant.omittedPoints,operator,aircraftTypeSource:'route-operator-pool'};
     track.spawnPoint=position.name;
+    track.isDeparture=ground;
     state.air.tracks.push(track);
     updateTrackSectors(state);
+    updateTrafficControl(state);
     state.bus?.emit('track:spawned',track);
     return track;
   }

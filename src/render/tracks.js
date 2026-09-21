@@ -1,9 +1,9 @@
 import { parseSpeedInstruction } from '../utils/speed.js';
 import { sectorMembershipTitle } from '../radar/sectors.js';
-import { assignHeading, navigationTarget } from '../radar/routes.js';
+import { navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 import { aircraftCeiling } from '../radar/performance.js';
-import { assignClearedLevel, assignVerticalRate } from '../radar/clearances.js';
+import { issueInstruction, proposedDisplayTrack } from '../radar/coordination.js';
 import { limitSpeedInstruction, speedLimits, speedMode } from '../radar/speed-control.js';
 
 const STATUS_COLORS = {
@@ -280,7 +280,7 @@ function normalizeVerticalAssignment(track, preserveFlag=false){
 }
 
 function clearVerticalAssignment(track){
-  assignVerticalRate(track, null);
+  issueInstruction(track, 'vertical', null);
 }
 
 function formatAssignedVerticalDisplay(assignment){
@@ -314,7 +314,7 @@ function levelItemsFromTrack(track){
       primaryLevel = { label:'CFL', value:track.clearedFlightLevel, field:'clearedFlightLevel' };
     }
   }else if(preferPel){
-    if(track.plannedEntryLevel!=null){
+    if(track.control || track.plannedEntryLevel!=null){
       primaryLevel = { label:'PEL', value:track.plannedEntryLevel, field:'plannedEntryLevel' };
     }else if(track.clearedFlightLevel!=null){
       primaryLevel = { label:'CFL', value:track.clearedFlightLevel, field:'clearedFlightLevel' };
@@ -343,6 +343,7 @@ function determinePrimaryLabel(track){
   const forceCfl = status === 'accepted' || status === 'intruder' || status === 'unconcerned';
   if(forceCfl) return 'CFL';
   if(preferPel){
+    if(track.control) return 'PEL';
     if(track.plannedEntryLevel!=null) return 'PEL';
     if(track.clearedFlightLevel!=null) return 'CFL';
     return 'PEL';
@@ -362,7 +363,7 @@ function updateLevelSegments(node, track, items){
   const primaryItem = items.find(item=>item.label === 'CFL' || item.label === 'PEL');
   const primaryLabel = primaryItem?.label || determinePrimaryLabel(track) || 'CFL';
   const primaryField = primaryItem?.field || (primaryLabel === 'PEL' ? 'plannedEntryLevel' : 'clearedFlightLevel');
-  const primaryEditable = !!primaryField;
+  const primaryEditable = !!primaryField && !(primaryField==='clearedFlightLevel' && track.control && track.control.owner!==track.control.sector);
   const primaryValue = primaryItem?.value ?? track?.[primaryField] ?? null;
   applyLevelSegment(segments.primary, primaryLabel, primaryValue, primaryEditable ? primaryField : null, primaryEditable);
   const unableCfl = primaryField === 'clearedFlightLevel' && Number.isFinite(track.unableCfl);
@@ -705,6 +706,7 @@ function filterAlerts(track){
 function updateLabelNode(node, track){
   node.track = track;
   node.revision = getTrackRevision(track);
+  track = proposedDisplayTrack(track);
   const status = track.status ? `status-${track.status}` : 'status-neutral';
   node.root.className = `track-label ${status}`;
 
@@ -783,6 +785,16 @@ function updateLabelNode(node, track){
   node.ecl.textContent = eclValue;
   node.ecl.title = track.expectedCruiseLevel!=null ? `ECL FL${formatFlightLevel(track.expectedCruiseLevel)}` : 'ECL';
   node.ecl.dataset.empty = eclValue === '--';
+  const pending=track.control?.pending || {};
+  const navigation=pending.navigation;
+  if(navigation?.kind==='direct')node.destination.textContent=navigation.value.point.name;
+  for(const [element,proposal] of [[node.levelSegments.primary.value,pending.plannedEntryLevel],
+    [node.assignedHeading,navigation?.kind==='heading' && navigation],
+    [node.destination,navigation?.kind==='direct' && navigation],
+    [node.assignedSpeed,pending.speed],[node.assignedVertical,pending.vertical]]){
+    element.classList.toggle('is-proposed',!!proposal);
+    if(proposal)element.title=`Proposal to ${proposal.owner}: awaiting acceptance`;
+  }
   node.needsMeasure = true;
 
   node.lastGroundSpeed = Number.isFinite(track.groundSpeed) ? Math.round(track.groundSpeed) : null;
@@ -1049,7 +1061,7 @@ function openHeadingPicker(node, anchor){
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
-        assignHeading(track, value);
+        issueInstruction(track, 'heading', value);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         close();
@@ -1068,13 +1080,13 @@ function openHeadingPicker(node, anchor){
         const parsed = parseInt(raw, 10);
         if(!Number.isFinite(parsed)) return false;
         const normalized = ((parsed % 360) + 360) % 360;
-        assignHeading(track, normalized);
+        issueInstruction(track, 'heading', normalized);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         return true;
       },
       onClear: ()=>{
-        assignHeading(track);
+        issueInstruction(track, 'heading', null);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
       },
@@ -1137,7 +1149,7 @@ function openSpeedPicker(node, anchor, requestedMode=null){
       option.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
-        track.assignedSpeed = limitSpeedInstruction(track, { mode, value: mode === 'Mach' ? Number(value.toFixed(MACH_LABEL_PRECISION)) : value });
+        issueInstruction(track, 'speed', limitSpeedInstruction(track, { mode, value: mode === 'Mach' ? Number(value.toFixed(MACH_LABEL_PRECISION)) : value }));
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         close();
@@ -1154,26 +1166,27 @@ function openSpeedPicker(node, anchor, requestedMode=null){
       max: limits.max,
       defaultValue: '',
       onSubmit: raw=>{
+        let speedValue;
         if(mode === 'Mach'){
           let parsed = parseFloat(raw);
           if(Number.isNaN(parsed)) return false;
           if(parsed >= 10) parsed /= 100;
           parsed = Math.min(Math.max(parsed, MACH_SPEED_MIN), MACH_SPEED_MAX);
-          track.assignedSpeed = { mode, value: Number(parsed.toFixed(MACH_LABEL_PRECISION)) };
+          speedValue = Number(parsed.toFixed(MACH_LABEL_PRECISION));
         }else{
           let parsed = parseFloat(raw);
           if(Number.isNaN(parsed)) return false;
           parsed = Math.round(parsed);
           parsed = Math.min(Math.max(parsed, IAS_SPEED_MIN), IAS_SPEED_MAX);
-          track.assignedSpeed = { mode, value: parsed };
+          speedValue = parsed;
         }
-        track.assignedSpeed = limitSpeedInstruction(track, track.assignedSpeed);
+        issueInstruction(track, 'speed', limitSpeedInstruction(track, {mode,value:speedValue}));
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
         return true;
       },
       onClear: ()=>{
-        track.assignedSpeed = { mode, value: null };
+        issueInstruction(track, 'speed', { mode, value: null });
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
       },
@@ -1207,7 +1220,7 @@ function openVerticalPicker(node, anchor){
       comparator = comparator === next ? 'exact' : next;
       updateComparatorButtons();
       if(selectedValue!=null){
-        assignVerticalRate(track, { value: selectedValue, comparator });
+        issueInstruction(track, 'vertical', { value: selectedValue, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1236,7 +1249,7 @@ function openVerticalPicker(node, anchor){
         evt.preventDefault();
         evt.stopPropagation();
         selectedValue = value;
-        assignVerticalRate(track, { value, comparator });
+        issueInstruction(track, 'vertical', { value, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1256,7 +1269,7 @@ function openVerticalPicker(node, anchor){
         if(!Number.isFinite(parsed)) return false;
         const quantized = Math.round(parsed / 100) * 100;
         selectedValue = quantized;
-        assignVerticalRate(track, { value: selectedValue, comparator });
+        issueInstruction(track, 'vertical', { value: selectedValue, comparator });
         track.labelRevision = (track.labelRevision || 0) + 1;
         normalizeVerticalAssignment(track);
         updateLabelNode(node, track);
@@ -1343,10 +1356,9 @@ function createLevelEditor(field, track, node, close, options){
   const applyValue = raw=>{
     const trimmed = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim();
     if(!trimmed){
-      const hadValue = track[field.key]!=null || (isCfl && track.unableCfl!=null);
+      const hadValue = track[field.key]!=null || track.control?.pending?.[field.key] || (isCfl && track.unableCfl!=null);
       if(hadValue){
-        if(isCfl) assignClearedLevel(track, null);
-        else track[field.key] = null;
+        issueInstruction(track, field.key, null);
         track.labelRevision = (track.labelRevision || 0) + 1;
         updateLabelNode(node, track);
       }
@@ -1359,9 +1371,8 @@ function createLevelEditor(field, track, node, close, options){
     }
     const clamped = Math.min(clampLevelValue(parsed),maxLevel);
     const previous = getTrackLevelValue(track, field.key);
-    if(isCfl || previous !== clamped || typeof track[field.key] !== 'number'){
-      if(isCfl) assignClearedLevel(track, clamped);
-      else track[field.key] = clamped;
+    if(isCfl || track.control?.pending?.[field.key] || previous !== clamped || typeof track[field.key] !== 'number'){
+      issueInstruction(track, field.key, clamped);
       track.labelRevision = (track.labelRevision || 0) + 1;
       updateLabelNode(node, track);
     }

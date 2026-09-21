@@ -12,7 +12,8 @@ import { registerLayer, addFeatures } from './render/layers.js';
 import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
 import { createDemoTracks } from './radar/tracks.js';
-import { updateTrackMovement } from './radar/movement.js';
+import { advanceTraffic, updateTrafficControl } from './radar/traffic-control.js';
+import { createAirspaceIndex } from './radar/airspace.js';
 import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
 import { createNavigationIndex } from './radar/routes.js';
@@ -45,7 +46,7 @@ async function bootstrap(){
 
   createTick(bus);
   bus.on('tick', dt=>{
-    updateTrackMovement(state, dt);
+    advanceTraffic(state, dt);
     updateTrackSectors(state);
     drawFrame(canvas, camera, state, overlayEl);
   });
@@ -81,6 +82,7 @@ async function loadDatasets(state, camera, canvasEl){
     state.air.sectorIndex = createSectorIndex(sectorDatasets.map(({data})=>data), {
       complete:sectorDatasets.length === entries.filter(isSector).length,
     });
+    state.air.airspaceIndex=createAirspaceIndex(state.air.sectorIndex,loaded.find(({entry})=>entry.layer==='FIR')?.data);
     state.map.project = project;
     state.air.navigationIndex = createNavigationIndex(loaded.filter(({entry})=>['WAYPOINTS','AIRPORTS'].includes(entry.layer)).map(({data})=>data));
     try {
@@ -114,11 +116,13 @@ async function loadDatasets(state, camera, canvasEl){
       }
     }
     state.air.tracks = createDemoTracks(project, state.air.airwayResolver);
+    updateTrafficControl(state);
     updateTrackSectors(state);
 
     try {
       const missingNavigation=entries.filter(e=>['FIR','WAYPOINTS','AIRPORTS'].includes(e.layer)).filter(e=>!loaded.some(d=>d.entry===e));
       if(missingNavigation.length)throw new Error('Required map/navigation files did not load.');
+      if(!state.air.airspaceIndex.complete)throw new Error('Required airspace volumes did not load; sector coordination is unavailable.');
       const firData=loaded.find(({entry})=>entry.layer==='FIR')?.data;
       state.air.spawner=await loadAircraftSpawner(state.air.airwayResolver,firData);
       const catalogue=state.air.spawner.catalogue;
