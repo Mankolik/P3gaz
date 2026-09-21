@@ -127,6 +127,7 @@ bus.emit('spawner:ready');
     await page.setViewportSize({width:1440,height:900});
     await page.goto(origin+'/');await page.waitForFunction(()=>!document.querySelector('.spawn-button')?.disabled);
     const before=await page.locator('.track-label').count();
+    assert.equal(before,0,'fresh startup contains no sample tracks');
     await button.click();await page.waitForFunction(n=>document.querySelectorAll('.track-label').length===n+1,before);
     await button.focus();await page.keyboard.press('Enter');
     await page.waitForFunction(n=>document.querySelectorAll('.track-label').length===n+2,before);
@@ -136,6 +137,10 @@ bus.emit('spawner:ready');
     await page.waitForFunction(()=>document.querySelector('.sector-panel__sequence')?.textContent.length>0);
     if(process.env.SPAWNER_SCREENSHOT)await page.screenshot({path:process.env.SPAWNER_SCREENSHOT});
     assert.deepEqual(errors,[]);
+    await page.reload();
+    await page.waitForFunction(()=>!document.querySelector('.spawn-button')?.disabled);
+    assert.equal(await page.locator('.track-label').count(),0,'refresh starts with empty traffic');
+    assert.equal(await page.locator('.sector-panel__callsign').textContent(),'Hover a track label');
     // Data failures keep the button disabled and explain why.
     await page.route('**/Airporty_revamped.txt',route=>route.fulfill({status:404,body:''}));
     await page.goto(origin+'/');await page.waitForFunction(()=>document.querySelector('.spawn-feedback')?.textContent.includes('unavailable'));

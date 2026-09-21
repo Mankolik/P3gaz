@@ -1,6 +1,6 @@
 # Aircraft spawner
 
-Use **+ Aircraft** at the top right. Each click creates one track whose label reflects its ownership and predicted entry into ALLFIR. The button waits for the navigation data and route catalogue; a load failure leaves it disabled with an explanation. A short message identifies the flight and its spawn fix or ground state. See [trajectory and coordination](trajectory.md) for airspace designators, automatic transfers and inbound proposals.
+The radar starts empty on initial load and refresh. Use **+ Aircraft** at the top right. Each click creates one track whose label reflects its ownership and predicted entry into ALLFIR. The button waits for the navigation data and route catalogue; a load failure leaves it disabled with an explanation. A short message identifies the flight and its spawn fix or ground state. See [trajectory and coordination](trajectory.md) for airspace designators, automatic transfers and inbound proposals.
 
 ## Selection and initial levels
 

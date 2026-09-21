@@ -11,8 +11,7 @@ import { initDefaultLayers } from './map/layers.js';
 import { registerLayer, addFeatures } from './render/layers.js';
 import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
-import { createDemoTracks } from './radar/tracks.js';
-import { advanceTraffic, updateTrafficControl } from './radar/traffic-control.js';
+import { advanceTraffic } from './radar/traffic-control.js';
 import { createAirspaceIndex } from './radar/airspace.js';
 import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
@@ -115,10 +114,6 @@ async function loadDatasets(state, camera, canvasEl){
         if(bounds) epwwBounds = mergeBounds(epwwBounds, bounds);
       }
     }
-    state.air.tracks = createDemoTracks(project, state.air.airwayResolver);
-    updateTrafficControl(state);
-    updateTrackSectors(state);
-
     try {
       const missingNavigation=entries.filter(e=>['FIR','WAYPOINTS','AIRPORTS'].includes(e.layer)).filter(e=>!loaded.some(d=>d.entry===e));
       if(missingNavigation.length)throw new Error('Required map/navigation files did not load.');

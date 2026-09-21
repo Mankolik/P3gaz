@@ -459,7 +459,23 @@ const fixture = `<!doctype html><link rel="stylesheet" href="/styles.css">
 
     // Load the actual application, not just the focused fixture.
     await page.goto(origin + '/index.html');
+    await page.waitForFunction(()=>!document.querySelector('.spawn-button')?.disabled);
+    assert.equal(await page.locator('.track-label').count(),0,'application starts without sample traffic');
+    // Explicitly spawn two tracks, then place test fixtures at known airspace
+    // boundaries. Production startup must not supply test traffic.
+    await page.locator('.spawn-button').click();
+    await page.locator('.spawn-button').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.track-label').length===2);
+    await page.evaluate(async()=>{
+      const {createDemoTracks}=await import('/src/radar/tracks.js');
+      const fixtures=createDemoTracks();
+      [...document.querySelector('#track-overlay').__trackNodes.values()].forEach(({track},i)=>{
+        for(const key of Object.keys(track))delete track[key];
+        Object.assign(track,fixtures[i]);
+      });
+    });
     await page.waitForFunction(()=>document.querySelectorAll('.track-label').length > 0);
+    await page.waitForFunction(()=>document.querySelector('#track-overlay').__trackNodes.has('WZZ1891'));
     await page.waitForFunction(()=>[...document.querySelectorAll('.track-label')].every(label=>label.dataset.sectorStatus !== 'unknown'));
     for(const label of ['Range','QL SC','FPL','MAP','CONFIG']){
       const dropdown=page.locator('.topgroup').filter({has:page.locator(':scope > .label',{hasText:new RegExp('^'+label+'$')})}).locator('.dropdown');

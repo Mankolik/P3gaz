@@ -42,7 +42,7 @@ export function updateTrafficControl(state,seconds=0){
     }
     if(physical===controlled){c.computerSector=null;c.computerTargetLevel=null;}
     advanceProposals(track);
-    const routeKey=track.navigationMode==='heading' ? ['heading',track.assignedHeading,track.heldHeading,Math.round(track.heading)] : trajectoryRoute(track);
+    const routeKey=trajectoryRoute(track);
     const signature=JSON.stringify([routeKey,track.exitFlightLevel,track.plannedEntryLevel,
       track.expectedCruiseLevel,track.sectorExitLevels,track.coordinationRevision,physical,c.hasEntered]);
     const old=cache.get(track);
