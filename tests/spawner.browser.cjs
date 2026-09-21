@@ -133,7 +133,7 @@ bus.emit('spawner:ready');
     const spawned=page.locator('.track-label').last();
     assert.match(await spawned.getAttribute('class'),/status-(accepted|inbound|preinbound|unconcerned|intruder)/);
     await spawned.dispatchEvent('pointerenter');
-    await page.waitForFunction(()=>document.querySelector('.sector-panel__trajectory')?.textContent.includes('Sequence:'));
+    await page.waitForFunction(()=>document.querySelector('.sector-panel__sequence')?.textContent.length>0);
     if(process.env.SPAWNER_SCREENSHOT)await page.screenshot({path:process.env.SPAWNER_SCREENSHOT});
     assert.deepEqual(errors,[]);
     // Data failures keep the button disabled and explain why.

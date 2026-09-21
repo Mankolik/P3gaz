@@ -43,7 +43,8 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   const label=page.locator('.track-label'),primary=label.locator('.level-primary button');
   assert.match(await label.getAttribute('class'),/status-inbound/);
   assert.equal(await label.locator('.level-primary').getAttribute('data-field'),'plannedEntryLevel');
-  await label.hover();assert.match(await page.locator('.sector-panel__trajectory').textContent(),/EDU → ALLFIR → ESA/);
+  await label.hover();assert.equal(await page.locator('.sector-panel__sequence').textContent(),'EDU → ALLFIR → ESA');
+  assert.match(await page.locator('.sector-panel__crossings').textContent(),/Current: EDU\nPredicted entry · FL · distance ahead\nALLFIR · FL350 · 120\.1 NM\nESA · FL350 · 360\.2 NM/);
   await primary.click();await page.locator('.track-picker input').fill('300');await page.keyboard.press('Enter');
   assert.equal(await primary.textContent(),'300');assert.equal(await primary.evaluate(e=>getComputedStyle(e).color),'rgb(255, 64, 64)');
   assert.deepEqual(await page.evaluate(()=>[window.test.t.plannedEntryLevel,window.test.t.clearedFlightLevel]),[350,350]);
@@ -77,6 +78,15 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   await page.evaluate(()=>{window.test.t.lon=0.1;window.test.render();window.test.t.lon=3.9;window.test.advance(4);});
   assert.match(await label.getAttribute('class'),/status-intruder/);
   await page.evaluate(()=>{window.test.t.lon=4.1;window.test.render();});assert.match(await label.getAttribute('class'),/status-unconcerned/);
+  assert.equal(await page.locator('.sector-panel__sequence').textContent(),'ESA → UNKNOWN');
+  await page.evaluate(()=>{window.test.t.assignedHeading=null;window.test.t.navigationMode='route';window.test.render();});
+  assert.equal(await page.locator('.sector-panel__sequence').textContent(),'ESA');
+  assert.match(await page.locator('.sector-panel__crossings').textContent(),/No further sector crossing/);
+  await page.evaluate(()=>{window.test.t.trajectory={sequence:[],complete:false,reason:'Airspace data unavailable'};window.test.state.bus.emit('tick',0);});
+  assert.equal(await page.locator('.sector-panel__sequence').textContent(),'');
+  assert.match(await page.locator('.sector-panel__message').textContent(),/Airspace data unavailable/);
+  await page.evaluate(()=>{window.test.state.air.tracks=[];window.test.state.bus.emit('tick',0);});
+  assert.equal(await page.locator('.sector-panel__callsign').textContent(),'Track unavailable');
   assert.deepEqual(errors,[]);
   console.log('PASS: real PEL/shortcut/H/S/R proposals stay red and inactive for three seconds; sector-relative transfer labels and sequence panel update');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
