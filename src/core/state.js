@@ -1,3 +1,5 @@
+import { createSectorisation } from '../radar/sectorisation.js';
+
 export function createState(bus){
   return {
     bus,
@@ -16,7 +18,7 @@ export function createState(bus){
       },
     },
     map: { layers: new Map(), projection: 'equirect', index: null },
-    air: { aircraft: [], routes: [], tracks: [], controlledSector:'ALLFIR', airspaceIndex:null, sectorIndex: null, navigationIndex: new Map(), airwayResolver: null, spawner: null, spawnError: null },
+    air: { aircraft: [], routes: [], tracks: [], controlledSector:'ALLFIR', sectorisation:createSectorisation(), airspaceIndex:null, sectorIndex: null, navigationIndex: new Map(), airwayResolver: null, spawner: null, spawnError: null },
     config: {},
   };
 }

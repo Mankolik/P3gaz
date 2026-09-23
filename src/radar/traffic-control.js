@@ -25,6 +25,8 @@ export function updateTrafficControl(state,seconds=0){
     if(!track.control)track.control={sector:controlled,owner:physical,physical,activeSector:physical,retainPhysicalVisit:true,time:0,pending:{},
       hasEntered:physical===controlled,enteredAt:physical===controlled?0:null,visit:0};
     const c=track.control;
+    c.sectorised=!!index.accSectors;
+    c.accSectors=index.accSectors;
     c.activeSector ??= c.physical;
     c.hasEnteredFir ||= insideEpww(index,track);
     c.time+=Math.max(0,seconds);
@@ -40,7 +42,7 @@ export function updateTrafficControl(state,seconds=0){
     }
     if(previous===physical)advanceProposals(track);
     const routeKey=trajectoryRoute(track);
-    const signature=()=>JSON.stringify([routeKey,track.exitFlightLevel,track.plannedEntryLevel,
+    const signature=()=>JSON.stringify([routeKey,track.exitFlightLevel,c.sectorised ? null : track.plannedEntryLevel,
       track.expectedCruiseLevel,track.sectorExitLevels,track.coordinationRevision,physical,c.hasEntered,
       c.activeSector,c.computerTargetLevel]);
     const old=cache.get(track);
@@ -60,9 +62,11 @@ export function updateTrafficControl(state,seconds=0){
       track.labelRevision=(track.labelRevision || 0)+1;
     }
     // Omitted physical visits neither take ownership nor issue clearances.
-    if(active!==controlled && active!=='UNKNOWN' && c.owner!==controlled && c.computerSector!==active){
+    const computerTarget=sectorTargetLevel(track,active,track.clearedFlightLevel ?? track.actualFlightLevel,!c.hasEntered);
+    if(active!==controlled && active!=='UNKNOWN' && c.owner!==controlled && (c.computerSector!==active
+      || (track.isDeparture && c.computerTargetLevel!==computerTarget))){
       c.computerSector=active;
-      c.computerTargetLevel=sectorTargetLevel(track,active,track.clearedFlightLevel ?? track.actualFlightLevel,!c.hasEntered);
+      c.computerTargetLevel=computerTarget;
       assignClearedLevel(track,c.computerTargetLevel);
     }
     if(active===controlled){c.computerSector=null;c.computerTargetLevel=null;}
@@ -70,8 +74,15 @@ export function updateTrafficControl(state,seconds=0){
     // computer clearance immediately, rather than waiting for the cache age.
     if(cache.get(track).signature!==signature())refreshTrajectory();
     const visits=track.trajectory.sequence;
+    if(c.sectorised){
+      const entry=visits.findIndex(v=>v.sector===controlled);
+      track.plannedEntryLevel=entry>0 ? visits[entry-1].targetLevel : track.plannedEntryLevel;
+    }
     const travelled=old && old===cache.get(track) ? distanceNm(old.position,track) : 0;
-    if(active===controlled){
+    if(c.reconfiguredAt!=null && c.time-c.reconfiguredAt<3){
+      // Reconfiguration transfers by current position, without immediately
+      // undoing that decision through the normal early-transfer window.
+    }else if(active===controlled){
       const next=visits[0]?.sector===controlled ? visits[1] : null;
       if(next && next.sector!=='UNKNOWN' && next.entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM && c.time-c.enteredAt>=3){
         c.owner=next.sector;c.sentTo=next.sector;

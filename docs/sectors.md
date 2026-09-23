@@ -18,6 +18,6 @@ TMA `vertical_bands` are checked separately, preserving gaps between bands. FL/S
 
 `track.sectorMembership` contains `{ status, sectors }`, where status is `inside`, `outside`, or `unknown`. Each sector has `id` (for example `E:HIGH`), `code`, `vertical`, `name`, `minFl`, `maxFl`, `kind` (`ACC` or `TMA`) and `priority`. TMA matches also retain their source `floor` and `ceiling`; multi-band features get distinct band IDs. On a change, `track:sector-changed` emits `{ track, previous, current }` and the label refreshes.
 
-This represents membership in the bundled ACC/TMA volumes. CTR handling, controller ownership, handoff state, traffic colors and the top-bar working-sector selection are separate features. Geometry files are not modified by the priority rules.
+This represents membership in the bundled ACC/TMA volumes. [Live sectorisation](sectorisation.md) groups ACC volumes for ownership, transfers, trajectory/ELW designators and map shading without changing this physical membership or the source geometry. CTR handling remains separate.
 
 Run the geometry and movement checks with `node --test tests/sectors.test.mjs`. The browser suite also checks that the live application's callsign tooltips show sector membership.

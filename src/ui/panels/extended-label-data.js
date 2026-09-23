@@ -13,7 +13,7 @@ export function extendedSectorSequence(track){
   const next=visits.findIndex((visit,i)=>i>current && !visit.skipped);
   let reachedEpww=!!(track?.control?.hasEnteredFir || track?.control?.hasEntered);
   return visits.map((visit,i)=>{
-    const domestic=epwwSectors.has(visit.sector);
+    const domestic=epwwSectors.has(visit.sector) || track?.control?.accSectors?.includes(visit.sector);
     if(domestic)reachedEpww=true;
     const level=visit.sector===(track.control?.sector || 'ALLFIR') ? track.exitFlightLevel
       : track.sectorExitLevels?.[visit.sector] ?? visit.targetLevel;

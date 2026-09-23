@@ -1,6 +1,7 @@
 import { getVisibleLayers } from './layers.js';
 import { drawTrackSymbols, projectTracksToScreen, syncTrackLabels, drawTrackConnectors, getRoutePreviewTrack, getRoutePreviewPoint } from './tracks.js';
 import { drawTrackRoutes } from './route-display.js';
+import { drawControlledFootprint } from './sector-footprint.js';
 
 const LAYER_STYLES = {
   FIR: { stroke: '#6c757d' },
@@ -96,6 +97,7 @@ export function drawFrame(canvas, camera, state, overlay){
     }
   }
 
+  drawControlledFootprint(ctx,state);
   ctx.globalCompositeOperation = 'source-over';
   const tracks = state?.air?.tracks || [];
   if(tracks.length){
