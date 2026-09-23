@@ -17,6 +17,7 @@ import { groupAirspace } from './radar/sectorisation.js';
 import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
 import { createNavigationIndex } from './radar/routes.js';
+import { createMultiplayerClient } from './multiplayer/client.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -25,6 +26,7 @@ async function bootstrap(){
   const bus = createBus();
   const state = createState(bus);
   loadConfig(state);
+  createMultiplayerClient(state);
 
   const canvas = initCanvas(canvasEl);
   let overlayEl = canvas.el.parentElement?.querySelector('#track-overlay');
@@ -46,7 +48,7 @@ async function bootstrap(){
 
   createTick(bus);
   bus.on('tick', dt=>{
-    advanceTraffic(state, dt);
+    if(!state.multiplayer.connected)advanceTraffic(state, dt);
     updateTrackSectors(state);
     drawFrame(canvas, camera, state, overlayEl);
   });

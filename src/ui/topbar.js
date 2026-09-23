@@ -5,6 +5,7 @@ import { loadJSON } from '../data/loader.js';
 import { initDefaultLayers } from '../map/layers.js';
 import { mountSpawnButton } from './spawn-button.js';
 import { mountSectorisationEditor } from './panels/sectorisation-panel.js';
+import { mountMultiplayerPanel } from './panels/multiplayer-panel.js';
 
 export function mountTopbar(root, state, bus){
   root.innerHTML = '';
@@ -45,7 +46,8 @@ export function mountTopbar(root, state, bus){
   const i2=el('div','info'); const kv2=el('div','kv'); kv2.append(el('span','k','Freq:'), el('span','v',state.ui.top.sectorFreq)); i2.append(kv2); gSec.append(i2);
   root.append(gSec);
   mountSectorisationEditor(gSec,state);
-  bus.on('sectorisation:changed',()=>{kv1.querySelector('.v').textContent=state.air.controlledSector;});
+  bus.on('sectorisation:changed',()=>{kv1.querySelector('.v').textContent=state.air.controlledSector || 'Observer';});
+  mountMultiplayerPanel(root,state);
 
   // FPL (stubs)
   const gFPL=wrap('FPL'); const ddFPL=dropdown('Menu', ['Open FPL list','Create from Call Sign…','Import FPL JSON…','Export FPL JSON'], 'Menu', ()=>{});

@@ -16,7 +16,7 @@ const lerp=(a,b,t)=>({lon:a.lon+(b.lon-a.lon)*t,lat:a.lat+(b.lat-a.lat)*t});
 export function sectorTargetLevel(track, sector, entryLevel, beforeControlled=true){
   const controlled=track.control?.sector || 'ALLFIR';
   let target=track.sectorExitLevels?.[sector];
-  if(sector===controlled)target=track.exitFlightLevel;
+  if(!track.control?.shared && sector===controlled)target=track.exitFlightLevel;
   else if(!track.control?.sectorised && beforeControlled && !Number.isFinite(target) && Number.isFinite(track.plannedEntryLevel))target=track.plannedEntryLevel;
   if(!Number.isFinite(target))target=track.isDeparture && Number.isFinite(track.expectedCruiseLevel)
     ? track.expectedCruiseLevel : entryLevel;
@@ -61,7 +61,9 @@ export function buildTrajectory(track,index){
       const speed=Math.max(60,calculateGroundSpeedFromInstruction(instruction,point.level*100,0,null) || track.groundSpeed || 400);
       const rate=Math.abs(target-point.level)>1e-6 ? Math.sign(target-point.level)*(schedule?.rateFpm || 1500) : 0;
       while(cutIndex<cuts.length-1 && cuts[cutIndex]*length<=along+1e-7)cutIndex++;
-      let seconds=Math.min(10,(cuts[cutIndex]*length-along)*3600/speed);
+      // At a constant level, speed is constant too: integrate exactly to the
+      // next geometry edge instead of rebuilding hundreds of identical samples.
+      let seconds=Math.min(rate ? 10 : Infinity,(cuts[cutIndex]*length-along)*3600/speed);
       if(rate){
         const nextLevel=rate>0 ? levels.find(fl=>fl>point.level+1e-6) : [...levels].reverse().find(fl=>fl<point.level-1e-6);
         const limit=rate>0 ? Math.min(target,nextLevel ?? target) : Math.max(target,nextLevel ?? target);

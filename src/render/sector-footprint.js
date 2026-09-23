@@ -5,6 +5,7 @@ export function controlledFootprint(index,sector){
   return (index?.volumes || []).filter(v=>v.kind==='ACC' && v.designator===sector).flatMap(v=>v.polygons);
 }
 export function drawControlledFootprint(ctx,state){
+  if(state.multiplayer?.connected && !state.air.controlledSector)return;
   const index=state.air?.airspaceIndex,project=state.map?.project,sector=state.air?.controlledSector || 'ALLFIR';
   if(!index || !project)return;
   let compiled=cache.get(index);

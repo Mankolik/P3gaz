@@ -15,7 +15,7 @@ export function extendedSectorSequence(track){
   return visits.map((visit,i)=>{
     const domestic=epwwSectors.has(visit.sector) || track?.control?.accSectors?.includes(visit.sector);
     if(domestic)reachedEpww=true;
-    const level=visit.sector===(track.control?.sector || 'ALLFIR') ? track.exitFlightLevel
+    const level=visit.sector===(track.multiplayer ? track.control?.sector : track.control?.sector || 'ALLFIR') ? track.exitFlightLevel
       : track.sectorExitLevels?.[visit.sector] ?? visit.targetLevel;
     return {text:domestic || !reachedEpww ? `${visit.sector}/${three(level)}` : visit.sector,status:visit.skipped ? 'skipped'
       : i===current ? 'current' : i===next ? 'next' : 'later'};
