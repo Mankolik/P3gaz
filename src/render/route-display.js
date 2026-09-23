@@ -71,5 +71,13 @@ export function drawTrackRoutes(ctx,camera,tracks,project,previewTrack=null,prev
       ctx.stroke();
     }
   }
+  // A receiving controller sees the proposed shortcut before accepting it.
+  // It is only a preview: aircraft navigation still follows the old clearance.
+  for(const track of tracks)for(const proposal of track.control?.incoming || []){
+    if(proposal.kind!=='direct' || !validPoint(proposal.value?.point))continue;
+    const [x,y]=project(proposal.value.point.lon,proposal.value.point.lat);
+    if(!Number.isFinite(track.x) || !Number.isFinite(track.y))continue;
+    ctx.strokeStyle='#00ffff';ctx.lineWidth=1.5*scale;ctx.beginPath();ctx.moveTo(track.x,track.y);ctx.lineTo(x,y);ctx.stroke();
+  }
   ctx.restore();
 }

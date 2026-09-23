@@ -554,6 +554,26 @@ function createLabelNode(){
     lastMetricsUpdate: 0,
   };
   labelNodes.set(root,node);
+  root.addEventListener('click',event=>{
+    const anchor=event.target.closest('[data-proposal-ids]');
+    if(!anchor || anchor.dataset.bypassProposal==='true' || !node.track?.respondProposal)return;
+    event.preventDefault();event.stopImmediatePropagation();
+    const ids=JSON.parse(anchor.dataset.proposalIds);
+    const proposals=[...Object.values(node.track.control.pending),...node.track.control.incoming].filter(p=>ids.includes(p.id));
+    showTrackPicker(node,anchor,'track-picker--proposal',(panel,close)=>{
+      for(const proposal of proposals){
+        const incoming=node.track.control.incoming.includes(proposal),title=document.createElement('strong');
+        title.textContent=`${incoming?'From '+proposal.senderSector:'To '+proposal.owner}: ${proposal.kind==='direct'?'DCT '+proposal.value.point.name:proposal.kind}`;panel.append(title);
+        for(const decision of incoming?['accept','reject']:['withdraw']){
+          const button=document.createElement('button');button.className='track-picker__option';button.textContent=decision[0].toUpperCase()+decision.slice(1);
+          button.onclick=()=>{node.track.respondProposal(proposal.id,decision);close();};panel.append(button);
+        }
+        if(!incoming){const edit=document.createElement('button');edit.className='track-picker__option';edit.textContent='Change proposal';edit.onclick=()=>{
+          close();anchor.dataset.bypassProposal='true';anchor.click();delete anchor.dataset.bypassProposal;
+        };panel.append(edit);}
+      }
+    });
+  },true);
 
   speedToggle.addEventListener('click', evt=>{
     evt.preventDefault();
@@ -786,14 +806,20 @@ function updateLabelNode(node, track){
   node.ecl.title = track.expectedCruiseLevel!=null ? `ECL FL${formatFlightLevel(track.expectedCruiseLevel)}` : 'ECL';
   node.ecl.dataset.empty = eclValue === '--';
   const pending=track.control?.pending || {};
-  const navigation=pending.navigation;
+  const incoming=track.control?.incoming || [];
+  const navigation=[pending.navigation,...incoming.filter(p=>p.key==='navigation')].filter(Boolean).at(-1);
   if(navigation?.kind==='direct')node.destination.textContent=navigation.value.point.name;
-  for(const [element,proposal] of [[node.levelSegments.primary.value,pending.plannedEntryLevel],
-    [node.assignedHeading,navigation?.kind==='heading' && navigation],
-    [node.destination,navigation?.kind==='direct' && navigation],
-    [node.assignedSpeed,pending.speed],[node.assignedVertical,pending.vertical]]){
-    element.classList.toggle('is-proposed',!!proposal);
-    if(proposal)element.title=`Proposal to ${proposal.owner}: awaiting acceptance`;
+  for(const [element,kind] of [[node.levelSegments.primary.value,'plannedEntryLevel'],[node.levelSegments.exit.value,'incomingLevel'],
+    [node.assignedHeading,'heading'],[node.destination,'direct'],[node.assignedSpeed,'speed'],[node.assignedVertical,'vertical'],[node.ecl,'expectedCruiseLevel']]){
+    const outgoing=kind==='incomingLevel'?[]:Object.values(pending).filter(p=>p.kind===kind);
+    const received=kind==='plannedEntryLevel'?[]:incoming.filter(p=>p.kind===(kind==='incomingLevel'?'plannedEntryLevel':kind));
+    const proposals=[...outgoing,...received];
+    element.classList.toggle('is-proposed',outgoing.length>0);element.classList.toggle('is-incoming',received.length>0);
+    delete element.dataset.proposalIds;
+    if(proposals.length){
+      element.title=received.length?`Proposal from ${received[0].senderSector}: click to accept or reject`:`Proposal to ${outgoing[0].owner}: awaiting acceptance`;
+      if(track.multiplayer)element.dataset.proposalIds=JSON.stringify(proposals.map(p=>p.id));
+    }
   }
   node.needsMeasure = true;
 
@@ -899,6 +925,7 @@ function shouldRefreshMetrics(node, track){
 
 function showTrackPicker(node, anchor, className, build){
   if(!node || !anchor || typeof build !== 'function') return;
+  if(node.track?.control?.readOnly)return;
   closeActivePicker();
   const panel = document.createElement('div');
   panel.className = `track-picker${className ? ` ${className}` : ''}`;

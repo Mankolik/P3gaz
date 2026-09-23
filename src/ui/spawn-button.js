@@ -14,13 +14,14 @@ export function mountSpawnButton(root,state,bus) {
     timeout=setTimeout(()=>feedback.classList.remove('visible'),6500);
   };
   const ready=()=>{
-    button.disabled=!state.air.spawner;
+    button.disabled=state.multiplayer?.connected ? !state.multiplayer.isHost() : !state.air.spawner;
     const count=state.air.spawner?.catalogue.groups.length;
     button.title=count?`Spawn aircraft from ${count} airport pairs`:state.air.spawnError||'Loading traffic routes…';
     if(state.air.spawnError)notify('Aircraft spawner unavailable: '+state.air.spawnError);
   };
-  bus.on('spawner:ready',ready);ready();
+  bus.on('spawner:ready',ready);bus.on('multiplayer:changed',ready);ready();
   button.addEventListener('click',()=>{
+    if(state.multiplayer?.connected){state.multiplayer.command('spawn').catch(error=>notify(error.message));return;}
     try {
       const track=state.air.spawner.spawn(state);
       notify(`${track.callsign} · ${track.departure} → ${track.destination} · ${track.onGround

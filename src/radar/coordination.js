@@ -8,6 +8,8 @@ const changed=track=>{
   track.labelRevision=(track.labelRevision || 0)+1;
 };
 const planSignature=track=>JSON.stringify(track.flightPlan?.waypoints || []);
+const transports=new WeakMap();
+export const bindInstructionTransport=(track,handler)=>transports.set(track,handler);
 export const proposalKey=kind=>['heading','direct'].includes(kind) ? 'navigation' : kind;
 
 function applyInstruction(track,kind,value){
@@ -36,6 +38,7 @@ function applyInstruction(track,kind,value){
 }
 
 export function issueInstruction(track,kind,value){
+  if(transports.has(track))return transports.get(track)(kind,value);
   const control=track.control;
   const remote=control && control.owner!==control.sector;
   if(kind==='clearedFlightLevel' && remote)return false;
@@ -83,12 +86,15 @@ export function advanceProposals(track){
 
 export function proposedDisplayTrack(track){
   const display={...track};
-  for(const p of Object.values(track.control?.pending || {})){
+  for(const p of [...Object.values(track.control?.pending || {}),...(track.control?.incoming || [])]){
     if(p.kind==='heading')display.assignedHeading=p.value;
     else if(p.kind==='speed')display.assignedSpeed=p.value;
     else if(p.kind==='vertical'){
       display.assignedVertical=p.value;display.verticalRateAssigned=p.value!=null;
-    }else if(p.kind==='plannedEntryLevel')display.plannedEntryLevel=p.value;
+    }else if(p.kind==='plannedEntryLevel'){
+      if(track.control?.incoming?.includes(p))display.exitFlightLevel=p.value;
+      else display.plannedEntryLevel=p.value;
+    }else if(p.kind==='expectedCruiseLevel')display.expectedCruiseLevel=p.value;
   }
   return display;
 }

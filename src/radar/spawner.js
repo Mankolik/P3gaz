@@ -50,7 +50,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     track.isDeparture=ground;
     state.air.tracks.push(track);
     updateTrackSectors(state);
-    updateTrafficControl(state);
+    if(!state.air.shared)updateTrafficControl(state);
     state.bus?.emit('track:spawned',track);
     return track;
   }

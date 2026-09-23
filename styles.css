@@ -190,3 +190,21 @@ footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; borde
 .sectorisation-editor .sectorisation-apply{ background:#194132; border-color:#3d8460; }
 .sectorisation-feedback{ min-height:20px; }
 @media(max-width:650px){ .sectorisation-layout{ grid-template-columns:1fr; } .sectorisation-groups{ max-height:170px; } .sectorisation-editor{ padding:14px; } }
+/* Multiplayer rooms and human coordination */
+.multiplayer-panel{ width:min(520px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; padding:22px; background:var(--panel); color:var(--text); border:1px solid #426078; border-radius:12px; font:14px/1.4 system-ui,sans-serif; }
+.multiplayer-panel::backdrop{ background:#0008; }
+.multiplayer-panel h2{ margin-top:0; }
+.multiplayer-panel input,.multiplayer-panel select,.multiplayer-panel button{ max-width:100%; padding:8px; margin:4px; border:1px solid #365069; border-radius:5px; background:#142230; color:var(--text); font:inherit; }
+.multiplayer-panel input[readonly]{ width:calc(100% - 8px); }
+.multiplayer-panel button{ cursor:pointer; }
+.multiplayer-panel button:disabled{ opacity:.4; }
+.multiplayer-panel [hidden]{ display:none; }
+.multiplayer-panel :focus-visible{ outline:2px solid #8fbfff; }
+.multiplayer-players{ margin:12px 0; padding:8px; background:#0b1117; }
+.multiplayer-players p{ margin:4px; }
+.multiplayer-message{ color:#b7d5ff; }
+.multiplayer-toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:15000; max-width:calc(100vw - 24px); padding:10px 14px; border:1px solid #426078; border-radius:6px; background:#142230; color:var(--text); font:13px system-ui,sans-serif; pointer-events:none; }
+.track-label .is-incoming{ color:#8fbfff !important; opacity:1 !important; cursor:pointer; }
+.track-label .is-incoming::after{ color:#8fbfff !important; }
+.track-picker--proposal{ display:flex; flex-direction:column; gap:8px; padding:12px; }
+.sectorisation-group select{ min-width:0; max-width:100%; }
