@@ -17,7 +17,7 @@ export function sectorTargetLevel(track, sector, entryLevel, beforeControlled=tr
   const controlled=track.control?.sector || 'ALLFIR';
   let target=track.sectorExitLevels?.[sector];
   if(sector===controlled)target=track.exitFlightLevel;
-  else if(beforeControlled && !Number.isFinite(target) && Number.isFinite(track.plannedEntryLevel))target=track.plannedEntryLevel;
+  else if(!track.control?.sectorised && beforeControlled && !Number.isFinite(target) && Number.isFinite(track.plannedEntryLevel))target=track.plannedEntryLevel;
   if(!Number.isFinite(target))target=track.isDeparture && Number.isFinite(track.expectedCruiseLevel)
     ? track.expectedCruiseLevel : entryLevel;
   return Math.max(0,Math.min(aircraftCeiling(track),target));

@@ -26,8 +26,10 @@ function applyInstruction(track,kind,value){
       track.sectorExitLevels={...track.sectorExitLevels,[previous]:value};
       // The simulated neighbouring controller issues its own matching CFL.
       const fallback=track.isDeparture ? track.expectedCruiseLevel : track.actualFlightLevel;
-      assignClearedLevel(track,Number.isFinite(value)?value:Math.min(aircraftCeiling(track),fallback));
-      track.control.computerTargetLevel=track.clearedFlightLevel;
+      if(previous===active){
+        assignClearedLevel(track,Number.isFinite(value)?value:Math.min(aircraftCeiling(track),fallback));
+        track.control.computerTargetLevel=track.clearedFlightLevel;
+      }
     }
   }else track[kind]=value;
   changed(track);

@@ -1,6 +1,6 @@
 # Trajectory and coordination
 
-The playable responsibility is **ALLFIR**, grouping the loaded Warszawa ACC volumes. Physical airspace, controlling owner, and the local label status are separate. The host simulation owns transfers and proposal timers; `statusForSector` derives a controller-relative view. This provides a basis for later divided ACC sectors; it does not implement networking or make neighbouring FIRs/TMAs playable.
+The playable responsibility is one configurable merged Warszawa ACC sector, **ALLFIR** by default. The [live sectorisation editor](sectorisation.md) partitions the 20 elementary Low/High volumes and selects the user's group. Physical airspace, controlling owner, and the local label status are separate. The host simulation owns transfers and proposal timers; `statusForSector` derives a controller-relative view. Networking is not implemented and neighbouring FIRs/TMAs are not playable. References to ALLFIR below also apply to the currently selected merged sector.
 
 ## Airspace designators
 
@@ -11,7 +11,7 @@ The playable responsibility is **ALLFIR**, grouping the loaded Warszawa ACC volu
 | EPWA, EPMO, EPRA | APWA |
 | EPGD | APGD |
 | EPSC / EPLB / EPRZ / EPSY / EPLL / EPBY | TSC / TLB / TRZ / TSY / TLL / TBY |
-| All EPWW ACC sectors | ALLFIR |
+| EPWW ACC sectors | Current merged group name; ALLFIR by default |
 | Inside EPWW, below FL095, outside TMAs | FIS |
 | Foreign FIR/UIR | First three characters of `AV_AIRSPAC`, e.g. EDU, ESA, UKL, UKB |
 
@@ -48,7 +48,7 @@ To avoid immediate accept/send oscillation in short visits, departure transfer w
 
 An inbound/pre-inbound label exposes **PEL**, including when empty; it never substitutes the previous controller's CFL. The local controller cannot edit a remotely owned CFL. PEL, H, S, R and direct-to changes to computer-owned traffic become red proposals while the old instruction remains active. Local XFL/ECL planning changes are immediate.
 
-After **three simulation seconds**, the computer accepts and applies the proposal. PEL acceptance updates the XFL of the last sector before ALLFIR and the computer's actual CFL. Clearing PEL removes that coordinated target, returning a departure to ECL and other traffic to its current level. H/S/R clearing is also proposed when remotely owned; normal baseline/heading-hold behavior applies after acceptance. Heading and direct-to share one pending navigation slot; other fields can be proposed independently. A replacement restarts that field's timer.
+After **three simulation seconds**, the computer accepts and applies the proposal. PEL acceptance updates the XFL of the last sector before the user's sector and, when that is the aircraft's active sector, the computer's actual CFL. Other upstream sectors keep their own targets. Clearing PEL removes that coordinated target, returning a departure to ECL and other traffic to its current level. H/S/R clearing is also proposed when remotely owned; normal baseline/heading-hold behavior applies after acceptance. Heading and direct-to share one pending navigation slot; other fields can be proposed independently. A replacement restarts that field's timer.
 
 Changing owner or physical sector visit cancels pending proposals. A route replacement also invalidates an outstanding shortcut; point/index validity is checked again when it is accepted. Red pending rate indications override an older orange unable indication. Normal aircraft ceiling and climb-rate unable behavior remains in force after acceptance.
 

@@ -13,6 +13,7 @@ import { fitAll, fitBounds } from './map/map-store.js';
 import { mountTopbar } from './ui/topbar.js';
 import { advanceTraffic } from './radar/traffic-control.js';
 import { createAirspaceIndex } from './radar/airspace.js';
+import { groupAirspace } from './radar/sectorisation.js';
 import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
 import { createNavigationIndex } from './radar/routes.js';
@@ -81,7 +82,7 @@ async function loadDatasets(state, camera, canvasEl){
     state.air.sectorIndex = createSectorIndex(sectorDatasets.map(({data})=>data), {
       complete:sectorDatasets.length === entries.filter(isSector).length,
     });
-    state.air.airspaceIndex=createAirspaceIndex(state.air.sectorIndex,loaded.find(({entry})=>entry.layer==='FIR')?.data);
+    state.air.airspaceIndex=groupAirspace(createAirspaceIndex(state.air.sectorIndex,loaded.find(({entry})=>entry.layer==='FIR')?.data),state.air.sectorisation);
     state.map.project = project;
     state.air.navigationIndex = createNavigationIndex(loaded.filter(({entry})=>['WAYPOINTS','AIRPORTS'].includes(entry.layer)).map(({data})=>data));
     try {
