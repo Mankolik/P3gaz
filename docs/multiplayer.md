@@ -55,7 +55,36 @@ Accepting a PEL proposal changes the preceding sector's XFL. It does not change 
 
 `server/room.js` owns room membership, permissions, clearances and proposals. `src/multiplayer/shared-traffic.js` owns shared movement and transfers. `src/multiplayer/view.js` projects a canonical aircraft into a player's view. The existing solo simulator remains available when disconnected.
 
-The server loads bundled navigation and the route catalogue once. Route distances remain cached on catalogue groups. It advances rooms at 10 Hz and broadcasts compressed changes at 2 Hz, with immediate updates after commands. Label placement and route visibility stay local. Level-flight trajectory integration skips repeated constant-altitude samples while retaining route boundary cuts and the existing climb/descent integration.
+The server loads bundled navigation and the route catalogue once. Route distances remain cached on catalogue groups. It advances rooms at 10 Hz and sends compressed changes at **3 Hz**, with immediate updates after commands. The network timer is separate from the simulation timer; speed, vertical rate, turning, waypoint passage and ownership still use the authoritative simulation. Label placement, route visibility, mouse input and drawing stay local. The future 2–3-second radar-sweep display option is not implemented here.
+
+Protocol 2 sends a complete snapshot on join or resynchronisation, then compact integer movement deltas, nested patches and removals. Room configuration/player lists/proposals are sent only when they change. Unchanged paused rooms send no state frames (WebSocket heartbeat remains). Sequence numbers detect a missing baseline; the browser requests a fresh snapshot instead of applying incorrect deltas. Old protocol-1 clients receive a refresh instruction.
+
+Only network copies of movement/prediction numbers are rounded: coordinates to 0.000001 degrees (about 0.11 m resolution in latitude), heading to 0.01°, ground speed to 0.01 kt, actual altitude to 0.001 FL (0.1 ft), and vertical speed to 0.1 ft/min. Full-precision server simulation, clearance values, flight-plan coordinates and DCT validation are preserved. Clients receive the sector crossings and levels required by labels/route drawing; server-only trajectory integration samples and prediction clocks are not transmitted.
+
+Static responses are gzip-compressed when supported and worth compressing, with representation-specific ETags and conditional `304` responses. The cache is bounded to 16 MiB per server. Unhashed files revalidate on reuse so deployments do not mix cached protocol versions. These changes save traffic while the entire application still runs on Render.
+
+## Preparing the Cloudflare / Render split
+
+The default remains one Render service serving both files and multiplayer. No Cloudflare account, deployment or DNS changes are made by this code change. Both eventual services can use the same repository; they select different build/start settings.
+
+1. Create a Cloudflare Pages project from this repository. Use `npm run build:static` as the build command and `dist` as the output directory, with Node 24. Set the build environment variable `MULTIPLAYER_URL=wss://YOUR-SERVICE.onrender.com/multiplayer`.
+2. On Render set `ALLOWED_ORIGINS=https://YOUR-PROJECT.pages.dev` (add a custom domain as a comma-separated exact origin if needed). No trailing slashes, wildcards or paths. The WebSocket server still accepts same-origin clients. Preview domains must be explicitly allowed if they need multiplayer access.
+3. Deploy the same protocol version to both sides between sessions, open the Pages URL and verify create/join, invitations and instructions. Invitation links stay on the frontend's domain; everyone connects to the configured Render backend.
+4. Once the frontend works, set `SERVE_STATIC=false` on Render. `/health` and `/multiplayer` remain available; static paths return 404. Keep the navigation assets and shared source code in the Render checkout: its simulation still needs them locally.
+
+`runtime-config.js` carries only the public WebSocket endpoint. It is generated during the static build, with no application-source edits required. `dist/` contains only HTML/CSS, browser source, assets and Pages headers; it excludes server files, tests and package/configuration files. Leave `MULTIPLAYER_URL` empty for same-origin operation. `SNAPSHOT_HZ` defaults to `3` and accepts values from `1` to `20`; changing it does not change the simulation rate.
+
+Keep Render automatic deployments off as described above. The split does not require changing that policy. After a deployment, clients must reload to receive protocol 2. Restarting the backend still ends rooms; this change does not introduce session persistence. Roll back both frontend and backend together if reverting the protocol.
+
+## Measuring bandwidth
+
+```sh
+npm run benchmark:bandwidth -- --seconds=30 --players=2 --aircraft=100 --seed=20260924
+```
+
+This starts a local server and real compressed WebSocket clients, spawns reproducible traffic, warms up for one second, and measures steady traffic until every client receives the final pause. It prints received TCP bytes, decoded JSON bytes, state counts and a projected hourly total across **all players**. TCP counts include WebSocket framing/compression, but exclude HTTP/static downloads, TLS and IP/TCP packet headers. The hourly number is an extrapolation from the test, not a Render billing measurement. Compare the same duration, player count, aircraft count and seed on both revisions. Route mix, clearances, simulation speed and hosting load affect the result.
+
+See [bandwidth optimisation measurements](bandwidth-optimisation.md) for the recorded before/after run.
 
 ## Tests
 
@@ -75,6 +104,8 @@ node tests/spawner.browser.cjs
 node tests/route-display.browser.cjs
 node tests/sectorisation.browser.cjs
 npm run test:multiplayer
+# Exercise the same two-browser workflow with separate frontend/backend origins:
+SPLIT_HOSTING=1 npm run test:multiplayer
 ```
 
-The multiplayer browser test starts a real local server and two isolated browser contexts. It verifies host assignment, differing PEL/CFL/XFL, red and light-blue proposals, acceptance without changing a human CFL, DCT preview and clearance, withdrawal, observer release and host departure.
+The multiplayer browser test starts a real local server and two isolated browser contexts. It verifies host assignment, differing PEL/CFL/XFL, red and light-blue proposals, acceptance without changing a human CFL, DCT preview and clearance, withdrawal, observer release, moving/climbing tracks and host departure. `SPLIT_HOSTING=1` serves the frontend on a separate origin and disables backend static serving. `BROWSER_EXECUTABLE_PATH` can select a locally installed Chromium binary.

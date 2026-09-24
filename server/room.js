@@ -10,7 +10,7 @@ import { proposalKey } from '../src/radar/coordination.js';
 import { updateSharedTraffic, advanceSharedTraffic } from '../src/multiplayer/shared-traffic.js';
 
 const finite=(value,min,max)=>Number.isFinite(value) && value>=min && value<=max;
-export const PROTOCOL_VERSION=1;
+export { PROTOCOL_VERSION } from '../src/multiplayer/protocol.js';
 export class Room {
   constructor(code,data,{random=Math.random,maxAircraft=200}={}){
     this.code=code;this.data=data;this.config=createSectorisation();this.revision=0;this.players=new Map();this.proposals=[];

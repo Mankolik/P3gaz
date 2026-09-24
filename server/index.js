@@ -1,38 +1,36 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Room, PROTOCOL_VERSION } from './room.js';
 import { loadSimulationData } from './data.js';
+import { SnapshotStream } from './snapshots.js';
+import { createStaticHandler } from './static.js';
 
 const root=path.resolve(fileURLToPath(new URL('../',import.meta.url)));
-const wireTrack=t=>{
-  const {x,y,vector,sectorMembership,...copy}=t;
-  if(t.control)copy.control={shared:true,sectorised:true,physical:t.control.physical,activeSector:t.control.activeSector,
-    owner:t.control.owner,hasEnteredFir:t.control.hasEnteredFir,visit:t.control.visit};
-  if(t.trajectory)copy.trajectory={...t.trajectory,points:t.trajectory.points.slice(0,1),omitted:[]};
-  if(t.directTo)copy.directTo={...t.directTo,plan:null};
-  return copy;
-};
-export async function createServer({data,maxRooms=8,maxAircraft=200}={}){
+export async function createServer({data,maxRooms=8,maxAircraft=200,
+  snapshotHz=Number(process.env.SNAPSHOT_HZ || 3),
+  serveStatic=process.env.SERVE_STATIC!=='false',
+  allowedOrigins=(process.env.ALLOWED_ORIGINS || '').split(',').map(s=>s.trim()).filter(Boolean),
+  multiplayerUrl=process.env.MULTIPLAYER_URL || '',
+}={}){
+  if(!Number.isFinite(snapshotHz) || snapshotHz<1 || snapshotHz>20)throw Error('SNAPSHOT_HZ must be between 1 and 20.');
+  const origins=new Set(allowedOrigins.map(origin=>{
+    const url=new URL(origin);
+    if(!['http:','https:'].includes(url.protocol) || url.origin!==origin)throw Error('ALLOWED_ORIGINS requires exact HTTP(S) origins without paths or trailing slashes.');
+    return url.origin;
+  }));
   data ||= await loadSimulationData();
-  const rooms=new Map(),baselines=new WeakMap();
+  const rooms=new Map(),streams=new WeakMap();
+  const staticHandler=createStaticHandler(root,{multiplayerUrl});
   const server=http.createServer(async(req,res)=>{
     try{
       const url=new URL(req.url,'http://localhost');
       if(url.pathname==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,protocol:PROTOCOL_VERSION}));}
       if(req.method!=='GET' && req.method!=='HEAD'){res.writeHead(405);return res.end();}
-      const name=decodeURIComponent(url.pathname==='/'?'/index.html':url.pathname);
-      if(name.includes('\\'))throw Error('Not public');
-      if(!/^\/(?:index\.html|styles\.css|favicon\.ico|(?:src|assets)\/[^\0]+)$/.test(name))throw Error('Not public');
-      const file=path.resolve(root,'.'+name);
-      if(!file.startsWith(root+path.sep) || name.split('/').some(p=>p.startsWith('.')))throw Error('Not public');
-      const content=await readFile(file);
-      res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.geojson':'application/geo+json','.woff2':'font/woff2','.woff':'font/woff','.png':'image/png','.svg':'image/svg+xml'})[path.extname(file)] || 'application/octet-stream');
-      res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','no-cache');
-      res.end(req.method==='HEAD'?undefined:content);
+      if(!serveStatic){res.writeHead(404);return res.end('Not found');}
+      await staticHandler(req,res,url);
     }catch{res.writeHead(404);res.end('Not found');}
   });
   const wss=new WebSocketServer({noServer:true,maxPayload:32768,perMessageDeflate:{
@@ -43,29 +41,32 @@ export async function createServer({data,maxRooms=8,maxAircraft=200}={}){
     if(socket.bufferedAmount>2*1024*1024){socket.close(1013,'Connection too slow');return;}
     socket.send(typeof message==='string'?message:JSON.stringify(message));
   };
-  function snapshot(room,full=false){
-    const old=baselines.get(room) || new Map(),next=new Map(),upserts=[];
-    for(const t of room.state.air.tracks){
-      const fields=wireTrack(t),prior=old.get(t.id),serialized={};
-      const changes={};
-      for(const [key,value] of Object.entries(fields)){
-        serialized[key]=JSON.stringify(value);
-        if(full || !prior || prior[key]!==serialized[key])changes[key]=value;
-      }
-      if(Object.keys(changes).length)upserts.push({id:t.id,fields:changes});
-      next.set(t.id,serialized);
-    }
-    const removed=[...old.keys()].filter(id=>!next.has(id));
-    if(!full)baselines.set(room,next);
-    return {type:'state',full,room:room.metadata(),upserts,removed};
+  function stream(room){
+    if(!streams.has(room))streams.set(room,new SnapshotStream());
+    return streams.get(room);
   }
-  function broadcast(room){
+  function broadcast(room,excludeId=null){
     if(room.ended)return;
-    const message=JSON.stringify(snapshot(room));for(const p of room.players.values())p.send(message);
+    const snapshot=stream(room).capture(room);if(!snapshot)return;
+    const message=JSON.stringify(snapshot);
+    for(const p of room.players.values())if(p.id!==excludeId)p.send(message);
+  }
+  function sendFull(room,player){
+    // Flush pending movement/membership changes to existing clients first so
+    // the new full snapshot and every subsequent delta share one baseline.
+    broadcast(room,player.id);
+    player.send(stream(room).capture(room,true));
   }
   server.on('upgrade',(req,socket,head)=>{
-    let origin;try{origin=req.headers.origin ? new URL(req.headers.origin).host : req.headers.host;}catch{socket.destroy();return;}
-    if(req.url!=='/multiplayer' || origin!==req.headers.host || wss.clients.size>=100){socket.destroy();return;}
+    let allowed=!req.headers.origin;
+    try{
+      if(req.headers.origin){
+        const origin=new URL(req.headers.origin);
+        allowed=['http:','https:'].includes(origin.protocol) && origin.origin===req.headers.origin
+          && (origin.host===req.headers.host || origins.has(origin.origin));
+      }
+    }catch{allowed=false;}
+    if(req.url!=='/multiplayer' || !allowed || wss.clients.size>=100){socket.destroy();return;}
     wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));
   });
   wss.on('connection',socket=>{
@@ -93,8 +94,10 @@ export async function createServer({data,maxRooms=8,maxAircraft=200}={}){
             const found=rooms.get(String(message.code || '').toUpperCase());if(!found)throw Error('Room not found or already ended.');
             player=found.add(message.initials,msg=>send(socket,msg));room=found;
           }else throw Error('Create or join a room first.');
-          clearTimeout(helloTimeout);send(socket,{type:'welcome',playerId:player.id,code:room.code});send(socket,snapshot(room,true));
+          clearTimeout(helloTimeout);send(socket,{type:'welcome',playerId:player.id,code:room.code});sendFull(room,player);
+          send(socket,{type:'ack',id:message.id});return;
         }else if(message.type==='leave'){socket.close(1000,'Left room');return;}
+        else if(message.type==='resync'){sendFull(room,player);send(socket,{type:'ack',id:message.id});return;}
         else room.command(player.id,message);
         broadcast(room);send(socket,{type:'ack',id:message.id});
       }catch(error){send(socket,{type:'ack',id:message?.id,error:error.message});}
@@ -108,17 +111,17 @@ export async function createServer({data,maxRooms=8,maxAircraft=200}={}){
     // Used only to close sockets of an ended room; no room credentials persist.
     socket.on('message',()=>{if(room)socket.roomCode=room.code;});
   });
-  let last=performance.now(),broadcastElapsed=0;
+  let last=performance.now();
   const timer=setInterval(()=>{
-    const now=performance.now(),seconds=Math.min(1,(now-last)/1000);last=now;broadcastElapsed+=seconds;
+    const now=performance.now(),seconds=Math.min(1,(now-last)/1000);last=now;
     for(const room of rooms.values()){
-      try{room.step(seconds);if(broadcastElapsed>=.5)broadcast(room);}
+      try{room.step(seconds);}
       catch(error){console.error('Room simulation failed',error);room.remove(room.hostId);rooms.delete(room.code);}
     }
-    if(broadcastElapsed>=.5)broadcastElapsed=0;
   },100);
+  const networkTimer=setInterval(()=>{for(const room of rooms.values())broadcast(room);},1000/snapshotHz);
   const heartbeat=setInterval(()=>{for(const socket of wss.clients){if(!socket.alive){socket.terminate();continue;}socket.alive=false;socket.ping();}},15000);
-  return {server,rooms,async close(){clearInterval(timer);clearInterval(heartbeat);for(const room of rooms.values())room.remove(room.hostId);for(const ws of wss.clients)ws.terminate();wss.close();await new Promise(resolve=>server.close(resolve));}};
+  return {server,rooms,async close(){clearInterval(timer);clearInterval(networkTimer);clearInterval(heartbeat);for(const room of rooms.values())room.remove(room.hostId);for(const ws of wss.clients)ws.terminate();wss.close();await new Promise(resolve=>server.close(resolve));}};
 }
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const app=await createServer();app.server.listen(Number(process.env.PORT || 3000),'0.0.0.0',()=>console.log('P3gaz multiplayer listening on port '+(process.env.PORT || 3000)));

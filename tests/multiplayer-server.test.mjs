@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { createServer } from '../server/index.js';
+import { PROTOCOL_VERSION, createStateReceiver } from '../src/multiplayer/protocol.js';
 import { cloneSectorisation,moveSectorMembers,ELEMENTARY_SECTORS } from '../src/radar/sectorisation.js';
 
 const until=async(predicate,ms=15000)=>{
   const start=Date.now();while(!predicate()){if(Date.now()-start>ms)throw Error('Timed out waiting for server state');await new Promise(resolve=>setTimeout(resolve,20));}
 };
 async function client(url){
-  const socket=new WebSocket(url),pending=new Map(),client={socket,tracks:new Map(),bytes:0,states:0,room:null,playerId:null};let serial=0;
+  const receiver=createStateReceiver(),socket=new WebSocket(url),pending=new Map(),client={socket,tracks:new Map(),bytes:0,states:0,room:null,playerId:null};let serial=0;
   socket.on('message',raw=>{
     client.bytes+=raw.length;const m=JSON.parse(raw);
     if(m.type==='welcome')client.playerId=m.playerId;
     if(m.type==='state'){
-      client.states++;client.room=m.room;if(m.full)client.tracks.clear();for(const id of m.removed)client.tracks.delete(id);
-      for(const {id,fields} of m.upserts)client.tracks.set(id,Object.assign(client.tracks.get(id)||{},fields));
+      assert(receiver.accept(m),'state sequence is continuous');client.states++;client.room=receiver.room;client.tracks=receiver.tracks;
     }
     if(m.type==='ended')client.ended=m.message;
     if(m.type==='ack'){const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve();}}
@@ -34,14 +34,14 @@ test('public server isolates rooms, rejects unauthorised commands, and synchroni
     assert.equal((await fetch(origin+'/')).status,200);
     assert.equal((await fetch(origin+'/health')).status,200);
     for(const name of ['/server/index.js','/.env','/.git/config','/assets/../../server/room.js','/assets/x%5c..%5c..%5cserver%5croom.js'])assert.equal((await fetch(origin+name)).status,404);
-    const host=await client(origin.replace('http:','ws:')+'/multiplayer');clients.push(host);await host.send('create',{protocol:1,initials:'P0'});
+    const host=await client(origin.replace('http:','ws:')+'/multiplayer');clients.push(host);await host.send('create',{protocol:PROTOCOL_VERSION,initials:'P0'});
     const room=app.rooms.get(host.room.code);
     await host.send('simulation',{paused:true,speed:1});
     for(let i=1;i<10;i++){
-      const c=await client(origin.replace('http:','ws:')+'/multiplayer');clients.push(c);await c.send('join',{protocol:1,code:room.code,initials:'P'+i});assert.equal(c.room.players.find(p=>p.id===c.playerId).sectorId,null);
+      const c=await client(origin.replace('http:','ws:')+'/multiplayer');clients.push(c);await c.send('join',{protocol:PROTOCOL_VERSION,code:room.code,initials:'P'+i});assert.equal(c.room.players.find(p=>p.id===c.playerId).sectorId,null);
     }
     const extra=await client(origin.replace('http:','ws:')+'/multiplayer');clients.push(extra);
-    await assert.rejects(extra.send('join',{protocol:1,code:room.code,initials:'XX'}),/ten players/);
+    await assert.rejects(extra.send('join',{protocol:PROTOCOL_VERSION,code:room.code,initials:'XX'}),/ten players/);
     await assert.rejects(clients[1].send('spawn'),/Only the host/);
     const config=cloneSectorisation(room.config);moveSectorMembers(config,ELEMENTARY_SECTORS,null);config.controlledId=config.groups[0].id;
     const assignments=Object.fromEntries([...room.players.values()].map((p,i)=>[p.id,config.groups[i].id]));
@@ -65,10 +65,15 @@ test('public server isolates rooms, rejects unauthorised commands, and synchroni
     // A late arrival receives a complete snapshot, including already-existing aircraft.
     const leaving=clients[9];leaving.socket.close();await until(()=>room.players.size===9);
     const late=await client(origin.replace('http:','ws:')+'/multiplayer');clients[9]=late;
-    await late.send('join',{protocol:1,code:room.code,initials:'P9'});
+    await late.send('join',{protocol:PROTOCOL_VERSION,code:room.code,initials:'P9'});
     assert.equal(late.tracks.size,100);assert.deepEqual(positions(late),positions(host));
+    const pausedStates=host.states;await new Promise(resolve=>setTimeout(resolve,750));
+    assert.equal(host.states,pausedStates,'paused unchanged rooms do not stream redundant snapshots');
+    await late.send('resync');assert.deepEqual(positions(late),positions(host));
+    await host.send('delete',{trackId:[...host.tracks.keys()][0]});await until(()=>late.tracks.size===99);
+    assert.deepEqual(positions(late),positions(host));
     // An independent room receives no traffic or commands from this room.
-    await extra.send('create',{protocol:1,initials:'XX'});assert.equal(extra.tracks.size,0);
+    await extra.send('create',{protocol:PROTOCOL_VERSION,initials:'XX'});assert.equal(extra.tracks.size,0);
     host.socket.close();await until(()=>clients.slice(1,10).every(c=>c.ended));assert.equal(app.rooms.has(room.code),false);
     assert.equal(app.rooms.size,1);
   }finally{for(const c of clients)c.socket.terminate();await app.close();}
