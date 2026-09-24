@@ -189,20 +189,20 @@ test('every eligible airborne variant spawns outside with two prior points and a
   }
 });
 
-test('airport departures start at FL010 / IAS180 and adopt type speed while holding their clearance',()=>{
+test('airport departures start at FL030 / IAS180 and adopt type speed while holding their clearance',()=>{
   for(const departure of ['EPWA','EPKK','EYVI','LKPR','EDDB']){
     const g=catalogue.groups.find(g=>g.departure===departure);
     assert(g,departure);
     const s=state(),t=createAircraftSpawner({groups:[g]},{random:()=>0}).spawn(s);
     assert.equal(t.onGround,false);assert.equal(t.spawnPoint,departure);
-    assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);assert.equal(t.groundSpeed,convertIasToTas(180,1000));
+    assert.equal(t.actualFlightLevel,30);assert.equal(t.clearedFlightLevel,30);assert.equal(t.groundSpeed,convertIasToTas(180,3000));
     assert.equal(t.assignedSpeed.value,null);
     const location=[t.lon,t.lat];updateTrackMovement(s,60);
-    assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,10);
+    assert.notDeepEqual([t.lon,t.lat],location);assert.equal(t.actualFlightLevel,30);
     const profile=aircraftPerformance(t.aircraftType);
-    assert.equal(t.groundSpeed,convertIasToTas(Math.max(profile.initialClimb.speed.value,profile.minimumCleanSpeedKnots-25),1000));
+    assert.equal(t.groundSpeed,convertIasToTas(Math.max(profile.initialClimb.speed.value,profile.minimumCleanSpeedKnots-25),3000));
     t.clearedFlightLevel=100;updateTrackMovement(s,10);
-    assert(t.actualFlightLevel>10);
+    assert(t.actualFlightLevel>30);
   }
 });
 
@@ -318,15 +318,15 @@ test('ECL uses airport general track and changes independently of initial XFL an
   const west=spawn(270,0.5),east=spawn(90,0.5),higher=spawn(90,1);
   assert.equal(west.expectedCruiseLevel,200);assert.equal(east.expectedCruiseLevel,210);assert.equal(higher.expectedCruiseLevel,230);
   for(const t of [west,east,higher]){
-    assert.equal(t.exitFlightLevel,null);assert.equal(t.actualFlightLevel,10);assert.equal(t.clearedFlightLevel,10);
+    assert.equal(t.exitFlightLevel,null);assert.equal(t.actualFlightLevel,30);assert.equal(t.clearedFlightLevel,30);
   }
 });
 
-test('all arrivals and overflights spawn at calculated ECL; departures retain FL010',()=>{
+test('all arrivals and overflights spawn at calculated ECL; departures retain FL030',()=>{
   let airborne=0,departures=0;
   for(const group of catalogue.groups)for(const variant of group.variants){
     const t=createAircraftSpawner({groups:[{...group,variants:[variant]}]},{random:()=>0.5}).spawn(state());
-    const expected=variant.groundStart?10:t.expectedCruiseLevel;
+    const expected=variant.groundStart?30:t.expectedCruiseLevel;
     assert.equal(t.actualFlightLevel,expected);assert.equal(t.clearedFlightLevel,expected);
     assert.equal(t.plannedEntryLevel,t.expectedCruiseLevel);assert.equal(t.exitFlightLevel,null);
     if(variant.groundStart)departures++;else airborne++;

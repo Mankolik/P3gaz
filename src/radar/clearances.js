@@ -1,11 +1,14 @@
 import { aircraftCeiling, aircraftPerformance } from './performance.js';
 
 // Rejected instructions never replace the level used by movement/navigation.
-export function assignClearedLevel(track, level){
+export function assignClearedLevel(track, level, {computer=false}={}){
   if(level!=null && !Number.isFinite(level)) return false;
   const unable = level!=null && level>aircraftCeiling(track);
   track.unableCfl = unable ? level : null;
-  if(!unable) track.clearedFlightLevel = level;
+  if(!unable){
+    track.clearedFlightLevel = level;
+    track.procedureAltitudeOverride=!computer && level!=null;
+  }
   track.labelRevision = (track.labelRevision || 0) + 1;
   return !unable;
 }

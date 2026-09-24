@@ -4,7 +4,8 @@ const normalize = degrees=>((degrees % 360) + 360) % 360;
 export const pointName = value=>String(value ?? '').trim().toUpperCase();
 export const validPoint = point=>!!pointName(point?.name) && Number.isFinite(point?.lon)
   && Math.abs(point.lon) <= 180 && Number.isFinite(point?.lat) && Math.abs(point.lat) <= 90;
-const copyPoint = point=>({name:pointName(point.name),lon:point.lon,lat:point.lat});
+const copyPoint = point=>({name:pointName(point.name),lon:point.lon,lat:point.lat,
+  ...(point.procedure ? {procedure:structuredClone(point.procedure)} : {})});
 const changed = track=>{ track.labelRevision = (track.labelRevision || 0) + 1; };
 
 export function createNavigationIndex(collections){
@@ -76,7 +77,7 @@ export function assignDirectTo(track, point, {planIndex=null,rejoinIndex=null}={
   if(rejoinIndex != null && (!rejoin || !validPoint(rejoin))) throw new Error('Choose a remaining flight-plan point to rejoin.');
   if(planIndex != null && rejoinIndex != null) throw new Error('A route shortcut already continues the flight plan.');
   if(planIndex != null) track.flightPlan.nextIndex=planIndex;
-  track.directTo = {target:copyPoint(point),planIndex,rejoinIndex,plan:track.flightPlan || null};
+  track.directTo = {target:copyPoint(planned || point),planIndex,rejoinIndex,plan:track.flightPlan || null};
   track.navigationIntercept = null;
   track.navigationMode = 'direct';
   track.assignedHeading = null;

@@ -36,7 +36,7 @@ export function extendedLabelData(track){
     destination:track.destination || track.sourceRoute?.destination || '----',frequency:'XXX,XXX',
     rules:'I',route:plannedRoutePoints(track).slice(0,5).map(p=>p.name).join(' '),
     cfl:`CFL${three(track.clearedFlightLevel)}`,ecl:`ECL${three(track.expectedCruiseLevel)}`,
-    freeText:'',selectedAltitude:`FL${three(track.clearedFlightLevel)}`,
+    freeText:track.arrivalNote || '',selectedAltitude:`FL${three(track.clearedFlightLevel)}`,
     heading:heading(track.heading),track:heading(track.heading),
     ias:three(air?.ias),mach:air ? air.mach.toFixed(2) : '-.--',
     gs:three(Number.isFinite(track.groundSpeed) && track.groundSpeed>=0 ? track.groundSpeed : null),

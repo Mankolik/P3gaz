@@ -3,6 +3,8 @@ import { buildTrajectory, trajectoryRoute, distanceNm, sectorTargetLevel } from 
 import { advanceProposals } from './coordination.js';
 import { updateTrackMovement } from './movement.js';
 import { assignClearedLevel } from './clearances.js';
+import { updateArrivalControl } from './procedure-guidance.js';
+import { removeFinishedTraffic } from './traffic-lifecycle.js';
 
 const cache=new WeakMap();
 export const TRANSFER_DISTANCE_NM=10;
@@ -63,13 +65,13 @@ export function updateTrafficControl(state,seconds=0){
     }
     // Omitted physical visits neither take ownership nor issue clearances.
     const computerTarget=sectorTargetLevel(track,active,track.clearedFlightLevel ?? track.actualFlightLevel,!c.hasEntered);
-    if(active!==controlled && active!=='UNKNOWN' && c.owner!==controlled && (c.computerSector!==active
+    if(!track.arrivalManaged && active!==controlled && active!=='UNKNOWN' && c.owner!==controlled && (c.computerSector!==active
       || (track.isDeparture && c.computerTargetLevel!==computerTarget))){
       c.computerSector=active;
       c.computerTargetLevel=computerTarget;
-      assignClearedLevel(track,c.computerTargetLevel);
+      assignClearedLevel(track,c.computerTargetLevel,{computer:true});
     }
-    if(active===controlled){c.computerSector=null;c.computerTargetLevel=null;}
+    if(active===controlled && !track.arrivalManaged){c.computerSector=null;c.computerTargetLevel=null;}
     // Keep the profile consistent with a just-entered meaningful sector's
     // computer clearance immediately, rather than waiting for the cache age.
     if(cache.get(track).signature!==signature())refreshTrajectory();
@@ -98,6 +100,7 @@ export function updateTrafficControl(state,seconds=0){
       }
     }
     // A transfer invalidates outstanding proposals to the previous owner.
+    updateArrivalControl(state,track);
     advanceProposals(track);
     const status=statusForSector(track,controlled);
     if(track.status!==status){track.status=status;track.labelRevision=(track.labelRevision || 0)+1;}
@@ -105,13 +108,14 @@ export function updateTrafficControl(state,seconds=0){
 }
 
 export function advanceTraffic(state,seconds){
-  if(!state.air?.airspaceIndex?.complete){updateTrackMovement(state,seconds);return;}
+  if(!state.air?.airspaceIndex?.complete){updateTrackMovement(state,seconds);removeFinishedTraffic(state,seconds);return;}
   updateTrafficControl(state,0);
   let remaining=Math.max(0,seconds || 0);
   while(remaining>0){
     const step=Math.min(0.5,remaining);
     updateTrackMovement(state,step);
     updateTrafficControl(state,step);
+    removeFinishedTraffic(state,step);
     remaining-=step;
   }
 }

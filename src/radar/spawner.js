@@ -5,6 +5,7 @@ import { aircraftPerformance } from './performance.js';
 import { convertIasToTas, convertMachToTas } from '../utils/speed.js';
 import { requestedCruiseLevel } from './cruise-level.js';
 import { updateTrafficControl } from './traffic-control.js';
+import { TMA_DESIGNATORS } from './airspace.js';
 
 const draw=random=>Math.max(0,Math.min(1-Number.EPSILON,random()));
 const choose=(items,random)=>items[Math.floor(draw(random)*items.length)];
@@ -19,6 +20,7 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
   }
   let sequence=0;
   function spawn(state) {
+    if(catalogue.boundary)state.air.firBoundary=catalogue.boundary;
     const active=new Set(state.air.tracks.map(t=>t.callsign));
     const available=catalogue.groups.map(g=>({...g,callsigns:g.callsigns.filter(c=>!active.has(c))})).filter(g=>g.callsigns.length);
     if(!available.length) throw new Error('All catalogue callsigns are already in use.');
@@ -29,15 +31,15 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
     const performance=aircraftPerformance(aircraftType);
     const heading=bearingToPoint(position,next);
     // One cruise draw supplies ECL and airborne spawn altitude. Departures
-    // start at FL010; the computer sector subsequently issues their climb CFL.
+    // start at FL030; the computer sector subsequently issues their climb CFL.
     const cruiseLevel=requestedCruiseLevel(group,performance,random);
     let id;
     do {id=`spawn-${++sequence}`;} while(state.air.tracks.some(t=>t.id===id));
     const ground=variant.groundStart;
     const track=createTrack({id,callsign,status:'accepted',lon:position.lon,lat:position.lat,heading,
-      groundSpeed:ground?convertIasToTas(180,1000):convertMachToTas(performance.cruise.mach,cruiseLevel*100),
-      verticalSpeed:0,actualFlightLevel:ground?10:cruiseLevel,
-      clearedFlightLevel:ground?10:cruiseLevel,plannedEntryLevel:cruiseLevel,exitFlightLevel:null,expectedCruiseLevel:cruiseLevel,
+      groundSpeed:ground?convertIasToTas(180,3000):convertMachToTas(performance.cruise.mach,cruiseLevel*100),
+      verticalSpeed:0,actualFlightLevel:ground?30:cruiseLevel,
+      clearedFlightLevel:ground?30:cruiseLevel,plannedEntryLevel:cruiseLevel,exitFlightLevel:null,expectedCruiseLevel:cruiseLevel,
       aircraftType,wake:/^(B74|B77|B78|A33|A34|A35|A38)/.test(aircraftType)?'H':'M',
       destination:group.destination,flightPlan:{waypoints:variant.waypoints,nextIndex:variant.spawnIndex+1},
       // Airport departures start airborne, ready to follow their route.
@@ -48,6 +50,11 @@ export function createAircraftSpawner(catalogue, {random=Math.random}={}) {
       omittedPoints:variant.omittedPoints,operator,aircraftTypeSource:'route-operator-pool'};
     track.spawnPoint=position.name;
     track.isDeparture=ground;
+    if(TMA_DESIGNATORS[group.destination]){
+      const airport=variant.waypoints.at(-1);
+      if(airport.name===group.destination)track.arrivalAirport={name:airport.name,lon:airport.lon,lat:airport.lat};
+    }
+    if(catalogue.boundary)track.hasBeenInsideFir=catalogue.boundary.contains(track);
     state.air.tracks.push(track);
     updateTrackSectors(state);
     if(!state.air.shared)updateTrafficControl(state);

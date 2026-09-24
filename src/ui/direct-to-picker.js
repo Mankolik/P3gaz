@@ -29,6 +29,10 @@ export function buildDirectToPicker(panel, {track,index,onChange,close}){
   };
   const pointButton=(label,point,options)=>{
     const node=button(label,()=>guard(()=>issueInstruction(track,'direct',{point,options})));
+    if(point.procedure){
+      const p=point.procedure;
+      node.title=`${p.type} ${p.name} · RWY ${p.runway} · ${p.altitudeText} · ${p.speedText}`;
+    }
     node.addEventListener('pointerenter',()=>previewPoints.set(panel,point));
     node.addEventListener('pointerleave',clearPreview);
     node.addEventListener('focus',()=>previewPoints.set(panel,point));

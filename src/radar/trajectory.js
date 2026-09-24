@@ -1,8 +1,9 @@
-import { airspaceAt, airspaceLegCuts } from './airspace.js';
+import { airspaceAt, airspaceLegCuts, TMA_DESIGNATORS } from './airspace.js';
 import { plannedRoutePoints as trajectoryRoute } from './planned-route.js';
 export { trajectoryRoute };
 import { aircraftCeiling, performanceSchedule } from './performance.js';
-import { effectiveSpeedInstruction } from './speed-control.js';
+import { effectiveProcedureSpeed } from './speed-control.js';
+import { procedureFlightLevel } from './procedure-guidance.js';
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
 import { filterSectorSequence } from './sector-sequence.js';
 
@@ -34,7 +35,10 @@ export function buildTrajectory(track,index){
   const levels=[...new Set([0,50,95,100,150,240,...index.volumes.flatMap(v=>[v.minFl,v.maxFl]),
     ...index.firs.flatMap(v=>[v.minFl,v.maxFl])])].sort((a,b)=>a-b);
   let iterations=0,complete=true;
-  for(const end of route){
+  const virtual={aircraftType:track.aircraftType,arrivalAirport:track.arrivalAirport,destination:track.destination,
+    navigationMode:'route',flightPlan:{waypoints:route,nextIndex:0}};
+  for(const [routeIndex,end] of route.entries()){
+    virtual.flightPlan.nextIndex=routeIndex;
     const start=point,length=distanceNm(start,end);
     if(length<1e-6)continue;
     const cuts=airspaceLegCuts(index,start,end);
@@ -55,25 +59,35 @@ export function buildTrajectory(track,index){
         target=sectorTargetLevel(track,sector,target,before);
         sequence.push({sector,entry:point,targetLevel:target});
       }
-      const virtual={aircraftType:track.aircraftType,actualFlightLevel:point.level,clearedFlightLevel:target};
+      const inArrival=!!track.arrivalAirport && sector===TMA_DESIGNATORS[track.destination]
+        && (!track.isDeparture || track.leftDepartureTerminal || sequence.some(v=>v.sector==='ALLFIR' || index.accSectors?.includes(v.sector)));
+      if(inArrival)sequence.at(-1).targetLevel=30;
+      Object.assign(virtual,{lon:point.lon,lat:point.lat,actualFlightLevel:point.level,
+        clearedFlightLevel:inArrival ? 30 : target,arrivalManaged:inArrival});
+      const guidedTarget=procedureFlightLevel(virtual);
+      virtual.clearedFlightLevel=guidedTarget;
       const schedule=performanceSchedule(virtual);
-      const instruction=effectiveSpeedInstruction(virtual,schedule);
+      const instruction=effectiveProcedureSpeed(virtual,schedule);
       const speed=Math.max(60,calculateGroundSpeedFromInstruction(instruction,point.level*100,0,null) || track.groundSpeed || 400);
-      const rate=Math.abs(target-point.level)>1e-6 ? Math.sign(target-point.level)*(schedule?.rateFpm || 1500) : 0;
+      const rate=Math.abs(guidedTarget-point.level)>1e-6 ? Math.sign(guidedTarget-point.level)*(schedule?.rateFpm || 1500) : 0;
       while(cutIndex<cuts.length-1 && cuts[cutIndex]*length<=along+1e-7)cutIndex++;
       // At a constant level, speed is constant too: integrate exactly to the
       // next geometry edge instead of rebuilding hundreds of identical samples.
-      let seconds=Math.min(rate ? 10 : Infinity,(cuts[cutIndex]*length-along)*3600/speed);
+      let seconds=Math.min(rate || inArrival || end.procedure ? 10 : Infinity,(cuts[cutIndex]*length-along)*3600/speed);
       if(rate){
         const nextLevel=rate>0 ? levels.find(fl=>fl>point.level+1e-6) : [...levels].reverse().find(fl=>fl<point.level-1e-6);
-        const limit=rate>0 ? Math.min(target,nextLevel ?? target) : Math.max(target,nextLevel ?? target);
+        // A moving descent profile must not shrink integration intervals toward
+        // zero after every capture. Still split exactly at fixed airspace bands.
+        const limit=inArrival ? (nextLevel ?? guidedTarget)
+          : rate>0 ? Math.min(guidedTarget,nextLevel ?? guidedTarget) : Math.max(guidedTarget,nextLevel ?? guidedTarget);
         seconds=Math.min(seconds,Math.abs(limit-point.level)*6000/Math.abs(rate));
       }
       seconds=Math.max(seconds,1e-5);
       const moved=Math.min(length-along,speed*seconds/3600);
       along+=moved;
-      const level=point.level+rate*seconds/6000;
-      point={...lerp(start,end,along/length),level:Math.abs(level-target)<1e-6 ? target : level,
+      const rawLevel=point.level+rate*seconds/6000;
+      const level=rate>0 ? Math.min(guidedTarget,rawLevel) : rate<0 ? Math.max(guidedTarget,rawLevel) : rawLevel;
+      point={...lerp(start,end,along/length),level:Math.abs(level-guidedTarget)<1e-6 ? guidedTarget : level,
         distanceNm:point.distanceNm+moved,timeSeconds:point.timeSeconds+seconds};
       points.push(point);
     }

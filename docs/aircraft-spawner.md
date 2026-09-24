@@ -8,7 +8,7 @@ Routes and callsigns come from `assets/sources/Airporty_revamped.txt`. Choose an
 
 `assets/sources/route-aircraft-types.txt` contains the user's aircraft list for all 184 directional pairs and 290 route/operator combinations. Directions are independent: for example, TAY is supplied only on EPWA–LFPG and CAI only on EYVI–LTAI. Missing or invalid pools prevent startup with an explanation; no reverse-route, source-type or B738 fallback is used. Wake category follows the selected type, including heavy widebodies. `track.sourceRoute.operator` and `aircraftTypeSource` record the selection's provenance.
 
-Arrivals and overflights spawn at the calculated ECL: AFL = CFL = PEL = ECL. There is one distance-based cruise-level draw; the earlier weighted altitude sampler is removed. Initial speed is the type's cruise Mach converted to TAS at this same altitude. Departures retain AFL/CFL 010 and a separately calculated ECL/PEL. All new aircraft start with empty XFL. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not control spawn altitude. Source variant aircraft types are likewise ignored when spawning.
+Arrivals and overflights spawn at the calculated ECL: AFL = CFL = PEL = ECL. There is one distance-based cruise-level draw; the earlier weighted altitude sampler is removed. Initial speed is the type's cruise Mach converted to TAS at this same altitude. Departures retain AFL/CFL 030 and a separately calculated ECL/PEL. All new aircraft start with empty XFL. Source route levels and inline annotations remain in `track.sourceRoute` as provenance only; they do not control spawn altitude. Source variant aircraft types are likewise ignored when spawning.
 
 ## Requested cruise level (ECL)
 
@@ -32,7 +32,7 @@ At catalogue compilation, `route-metrics.js` resolves the departure and destinat
 
 Where performance is supplied, the ceiling and optional `maxCruiseFL` limit the eligible levels before snapping, so clamping cannot produce an invalid east/west level. A restrictive aircraft limit can place ECL below the distance band. The present profiles provide `ceilingFL`.
 
-The generated level supplies `expectedCruiseLevel` (the ECL label field), PEL, and initial AFL/CFL for arrivals and overflights. Departures still have AFL/CFL 010. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. Editing ECL later does not fill XFL or issue a climb clearance.
+The generated level supplies `expectedCruiseLevel` (the ECL label field), PEL, and initial AFL/CFL for arrivals and overflights. Departures still have AFL/CFL 030. **All new aircraft start with an empty XFL.** ECL is shown in its existing compact tens-of-FL format on label hover, with the full value in its title. Editing ECL later does not fill XFL or issue a climb clearance.
 
 An empty XFL appears as a blank, always-visible box using the label controls' 1px `currentColor` outline. Filling XFL removes the persistent outline and restores normal behavior: matching CFL values hide until hovering/focusing the levels, and different values stay visible. Clearing XFL restores the empty box. Column geometry stays fixed, and ECL edits leave XFL intact.
 
@@ -50,11 +50,11 @@ EPWW airway sections use the bundled PANSA dataset, in the order needed by the r
 
 The FIR outline and airway coordinates come from separate datasets. For foreign-leg classification only, an edge tolerance of 0.5 NM accommodates boundary fixes slightly displaced from the FIR outline. The spawn point itself must be outside the actual polygon and outside this tolerance. A leg crossing the FIR interior cannot be discarded as foreign.
 
-Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N02030E`), adjacent fixes, DCT, level-only and combined speed/level suffixes are supported. Generic SID/STAR markers connect the airport to the first/last en-route fix directly; actual procedures are not generated.
+Five-letter points, navaid identifiers, coordinate fixes (`63N010W` / `5230N02030E`), adjacent fixes, DCT, level-only and combined speed/level suffixes are supported. Explicit SID/STAR markers expand the matching bundled procedure. DCT connectors stay unchanged. See [terminal procedures](terminal-procedures.md) for restrictions, fixed variants, progressive arrivals and cleanup.
 
 ## Ground departures
 
-Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL010 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 183 kt in calm air at FL010), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. With airspace control loaded, the computer-controlled departure sector issues a CFL toward its coordinated exit level (PEL, initially ECL). Once ALLFIR accepts ownership, actual flight follows that clearance until the controller changes CFL. This is a generic departure, without taxi, runway roll or a published SID.
+Airports inside EPWW and the explicit exceptions EYVI, LKPR and EDDB start at their airport reference point, already airborne at AFL030 and **180 kt IAS**, immediately following the route. The initial groundspeed is the altitude-adjusted TAS (about 188 kt in calm air at FL030), not 180 kt GS. No speed clearance is installed: movement smoothly adopts the type's initial-climb IAS, then its altitude/phase schedule. With airspace control loaded, the computer-controlled departure sector issues a CFL toward its coordinated exit level (PEL, initially ECL). Once ALLFIR accepts ownership, actual flight follows that clearance until the controller changes CFL. There is no taxi or runway roll; explicitly marked SID routes now follow their published fix sequence.
 
 ## Aircraft performance
 
@@ -115,4 +115,4 @@ node tests/spawner.browser.cjs
 node tests/track-labels.browser.cjs
 ```
 
-Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, every supplied operator/type choice, directional pool differences, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, airborne spawning at ECL, moving FL010 departures, gradual rate changes at phase boundaries and high frame rates, 110% climb requests, uncapped descent requests through the picker, duplicate prevention, startup failures, real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.
+Browser checks require Playwright; `BROWSER_CHANNEL=chrome` selects installed Chrome. Tests cover all compiled variants, every supplied operator/type choice, directional pool differences, the real BIVKI entry, boundary geometry, parsing/expansion, selection order, airborne spawning at ECL, moving FL030 departures, gradual rate changes at phase boundaries and high frame rates, 110% climb requests, uncapped descent requests through the picker, duplicate prevention, startup failures, real accepted labels, keyboard activation and button placement at 1440/1100/650/390 px.
