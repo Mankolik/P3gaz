@@ -71,7 +71,7 @@ export function createFirBoundary(collection) {
   const foreignLeg=(a,b)=>[a,b].every(p=>!contains(p)||nearEdge(p))
     && !intervals(a,b).some(part=>part.inside && [0.25,0.5,0.75].some(t=>
       !nearEdge(interpolate(a,b,part.start+(part.end-part.start)*t))));
-  return {contains,firstEntry,nearEdge,foreignLeg,intersects:(a,b)=>intervals(a,b).some(p=>p.inside)};
+  return {contains,firstEntry,nearEdge,foreignLeg,distanceToEdge,intersects:(a,b)=>intervals(a,b).some(p=>p.inside)};
 }
 
 export function findSpawnIndex(points, boundary) {

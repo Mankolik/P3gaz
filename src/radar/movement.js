@@ -1,8 +1,9 @@
 import { calculateGroundSpeedFromInstruction } from '../utils/speed.js';
-import { effectiveSpeedInstruction } from './speed-control.js';
+import { effectiveProcedureSpeed } from './speed-control.js';
 import { navigationTarget, navigationHeading, passedNavigationPoint, completeNavigationPoint } from './routes.js';
 import { aircraftPerformance, aircraftCeiling, performanceSchedule } from './performance.js';
 import { requestedVerticalRate, PERFORMANCE_RATE_CHANGE_FPM_PER_SECOND } from './vertical-rate.js';
+import { remainingProcedureRoute, procedureFlightLevel, procedureVerticalRate } from './procedure-guidance.js';
 
 const RATE_ONE_DEG_PER_SECOND = 3; // degrees per second
 const DEFAULT_SPEED_CHANGE_RATE = 5; // knots per second
@@ -101,9 +102,11 @@ function advanceTrack(track, dtSeconds, project){
   const nextHeading = updateHeading(track, heading, dtSeconds, targetPoint ? navigationHeading(track,targetPoint) : null);
   track.heading = nextHeading;
 
-  const performance=performanceSchedule(track);
+  const procedureRoute=remainingProcedureRoute(track);
+  const targetLevel=procedureFlightLevel(track,procedureRoute);
+  const performance=performanceSchedule({...track,clearedFlightLevel:targetLevel});
   if(performance)track.performancePhase=performance.phase;
-  const speed = updateGroundSpeed(track, dtSeconds, nextHeading, performance);
+  const speed = updateGroundSpeed(track, dtSeconds, nextHeading, performance,procedureRoute);
   const lon = track.lon;
   const lat = track.lat;
 
@@ -127,7 +130,7 @@ function advanceTrack(track, dtSeconds, project){
   track.x = projected.x;
   track.y = projected.y;
 
-  updateVerticalState(track, dtSeconds, performance);
+  updateVerticalState(track, dtSeconds, performance,targetLevel,procedureRoute);
 
   updateTrackVector(track, project);
 }
@@ -185,10 +188,10 @@ function shortestHeadingDelta(current, target){
   return delta;
 }
 
-function updateGroundSpeed(track, dtSeconds, heading, performance){
+function updateGroundSpeed(track, dtSeconds, heading, performance,procedureRoute){
   const currentSpeed = Number.isFinite(track?.groundSpeed) ? Math.max(track.groundSpeed, 0) : 0;
   // Opposite-mode restrictions wait until crossing the conversion level.
-  const assigned = effectiveSpeedInstruction(track, performance);
+  const assigned = effectiveProcedureSpeed(track, performance,procedureRoute);
   const target = calculateTargetGroundSpeed(track, assigned, heading);
   if(target==null || !Number.isFinite(target)){
     return currentSpeed;
@@ -262,7 +265,7 @@ function determineTargetFlightLevel(track){
   return null;
 }
 
-function updateVerticalState(track, dtSeconds, performance){
+function updateVerticalState(track, dtSeconds, performance,procedureTarget,procedureRoute){
   if(!Number.isFinite(dtSeconds) || dtSeconds <= 0){
     return;
   }
@@ -279,7 +282,7 @@ function updateVerticalState(track, dtSeconds, performance){
     return;
   }
 
-  const requestedLevel = determineTargetFlightLevel(track);
+  const requestedLevel = procedureTarget ?? determineTargetFlightLevel(track);
   const targetLevel = requestedLevel==null?null:clamp(requestedLevel,MIN_FLIGHT_LEVEL,ceiling);
   if(targetLevel==null){
     const currentRate = Number(track.verticalSpeed) || 0;
@@ -299,7 +302,8 @@ function updateVerticalState(track, dtSeconds, performance){
   const direction = diff > 0 ? 1 : -1;
   let desiredRate = 0;
   if(performance){
-    desiredRate=requestedVerticalRate(performance.rateFpm,direction,assignment);
+    const baseline=procedureVerticalRate(track,performance.rateFpm,direction,procedureRoute);
+    desiredRate=requestedVerticalRate(baseline,direction,assignment);
   }else if(assignment){
     const magnitude = Math.abs(assignment.value);
     if(magnitude === 0){

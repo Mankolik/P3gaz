@@ -1,6 +1,7 @@
 import { validPoint } from './routes.js';
 import { findSpawnIndex } from './fir-boundary.js';
 import { cacheRouteMetrics } from './route-metrics.js';
+import { findTerminalProcedure, procedureRoutePoints } from './terminal-routes.js';
 
 const AIRWAY=/^(?:U)?[A-Z]\d{1,4}$/;
 const SPEED_LEVEL=/^(?:N\d{4}|K\d{4}|M\d{3})(?:F\d{3}|A\d{3}|S\d{4}|M\d{4})$/;
@@ -123,7 +124,21 @@ export function compileRouteCatalogue(groups, resolver, boundary, metricsOptions
             } else {
               throw new Error(`Cannot expand EPWW section ${from.name} ${connector} ${to.name}.`);
             }
-          } else append(to); // Explicit DCT, adjacent fixes or generic SID/STAR connectors.
+          } else {
+            // Only explicitly filed SID/STAR connectors may expand procedures.
+            const explicit=variant.route.toUpperCase().split(/\s+/).includes(connector);
+            const procedure=explicit && (connector==='SID' && i===1
+              ? findTerminalProcedure(group.departure,'SID',to.name)
+              : connector==='STAR' && i===rawPoints.length-1
+                ? findTerminalProcedure(group.destination,'STAR',from.name) : null);
+            if(procedure){
+              const terminal=procedureRoutePoints(procedure);
+              // Replace the shared connecting fix; keep its restriction exactly once.
+              if(connector==='STAR' && points.at(-1)?.name===from.name)points.pop();
+              terminal.forEach(append);
+              if(connector==='STAR')append(to);
+            }else append(to);
+          }
         }
         finish();
         const relevant=blocks.filter(block=>block.some(p=>boundary.contains(p)) || block.some((p,i)=>i && boundary.intersects(block[i-1],p)));
@@ -148,6 +163,6 @@ export function compileRouteCatalogue(groups, resolver, boundary, metricsOptions
     }
     if(variants.length) compiled.push({...group,variants});
   }
-  return {groups:cacheRouteMetrics(compiled,name=>resolver.resolvePoint(name),metricsOptions),diagnostics,totalGroups:groups.length,totalVariants:groups.reduce((n,g)=>n+g.variants.length,0),
+  return {boundary,groups:cacheRouteMetrics(compiled,name=>resolver.resolvePoint(name),metricsOptions),diagnostics,totalGroups:groups.length,totalVariants:groups.reduce((n,g)=>n+g.variants.length,0),
     validVariants:compiled.reduce((n,g)=>n+g.variants.length,0)};
 }

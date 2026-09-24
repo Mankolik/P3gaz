@@ -18,6 +18,7 @@ import { createSectorIndex, updateTrackSectors } from './radar/sectors.js';
 import { mountSectorPanel } from './ui/panels/sector-panel.js';
 import { createNavigationIndex } from './radar/routes.js';
 import { createMultiplayerClient } from './multiplayer/client.js';
+import { addTerminalNavigation } from './radar/terminal-routes.js';
 
 async function bootstrap(){
   const canvasEl = document.getElementById('radar');
@@ -87,6 +88,7 @@ async function loadDatasets(state, camera, canvasEl){
     state.air.airspaceIndex=groupAirspace(createAirspaceIndex(state.air.sectorIndex,loaded.find(({entry})=>entry.layer==='FIR')?.data),state.air.sectorisation);
     state.map.project = project;
     state.air.navigationIndex = createNavigationIndex(loaded.filter(({entry})=>['WAYPOINTS','AIRPORTS'].includes(entry.layer)).map(({data})=>data));
+    addTerminalNavigation(state.air.navigationIndex);
     try {
       state.air.airwayResolver = await loadAirways(state.air.navigationIndex);
     } catch(err){

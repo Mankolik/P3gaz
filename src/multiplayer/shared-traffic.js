@@ -2,6 +2,8 @@ import { airspaceAt, insideEpww } from '../radar/airspace.js';
 import { buildTrajectory, trajectoryRoute, distanceNm, sectorTargetLevel } from '../radar/trajectory.js';
 import { updateTrackMovement } from '../radar/movement.js';
 import { assignClearedLevel } from '../radar/clearances.js';
+import { updateArrivalControl } from '../radar/procedure-guidance.js';
+import { removeFinishedTraffic } from '../radar/traffic-lifecycle.js';
 
 const cache=new WeakMap();
 export function updateSharedTraffic(state,seconds=0){
@@ -27,16 +29,17 @@ export function updateSharedTraffic(state,seconds=0){
       else if(c.sentTo && (!next || next.sector!==c.sentTo)){c.owner=active;c.sentTo=null;}
     }
     const target=sectorTargetLevel(t,active,t.clearedFlightLevel ?? t.actualFlightLevel);
-    if(!humans.has(active) && !humans.has(c.owner) && active!=='UNKNOWN'){
+    updateArrivalControl(state,t);
+    if(!t.arrivalManaged && !humans.has(active) && !humans.has(c.owner) && active!=='UNKNOWN'){
       if(c.computerSector!==active || (t.isDeparture && c.computerTargetLevel!==target)){
-        c.computerSector=active;c.computerTargetLevel=target;assignClearedLevel(t,target);
+        c.computerSector=active;c.computerTargetLevel=target;assignClearedLevel(t,target,{computer:true});
       }
-    }else{c.computerSector=null;c.computerTargetLevel=null;}
+    }else if(!t.arrivalManaged){c.computerSector=null;c.computerTargetLevel=null;}
     if(cache.get(t).key!==signature())refresh();
   }
 }
 export function advanceSharedTraffic(state,seconds){
   updateSharedTraffic(state);
   let left=seconds;
-  while(left>0){const step=Math.min(.5,left);updateTrackMovement(state,step);updateSharedTraffic(state,step);left-=step;}
+  while(left>0){const step=Math.min(.5,left);updateTrackMovement(state,step);updateSharedTraffic(state,step);removeFinishedTraffic(state,step);left-=step;}
 }

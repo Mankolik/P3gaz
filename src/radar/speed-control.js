@@ -1,4 +1,6 @@
 import { aircraftPerformance, performanceSchedule } from './performance.js';
+import { procedureSpeed } from './procedure-guidance.js';
+import { calculateAirSpeeds, calculateGroundSpeedFromInstruction } from '../utils/speed.js';
 
 // The supplied schedule changes speed mode at FL240, rather than using a
 // calculated aerodynamic crossover. Rate phase boundaries stay independent.
@@ -33,4 +35,14 @@ export function effectiveSpeedInstruction(track, schedule=performanceSchedule(tr
     baseline={mode,value:aircraftPerformance(track.aircraftType).initialDescent.speed.value};
   }
   return limitSpeedInstruction(track,assigned?.mode===mode ? assigned : baseline);
+}
+
+export function effectiveProcedureSpeed(track,schedule,route){
+  const baseline=effectiveSpeedInstruction(track,schedule),restricted=procedureSpeed(track,baseline,route);
+  if(restricted===baseline)return baseline;
+  const altitude=track.actualFlightLevel*100;
+  const ground=calculateGroundSpeedFromInstruction(baseline,altitude,track.heading || 0,track.wind);
+  const ias=calculateAirSpeeds(ground ?? track.groundSpeed,altitude,track.heading || 0,track.wind)?.ias;
+  return {mode:'IAS',value:Math.max(speedLimits(track,'IAS').min,restricted.min,
+    Math.min(ias ?? track.groundSpeed,restricted.max))};
 }
