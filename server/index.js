@@ -10,7 +10,7 @@ import { createStaticHandler } from './static.js';
 
 const root=path.resolve(fileURLToPath(new URL('../',import.meta.url)));
 export async function createServer({data,maxRooms=8,maxAircraft=200,
-  snapshotHz=Number(process.env.SNAPSHOT_HZ || 3),
+  snapshotHz=Number(process.env.SNAPSHOT_HZ || 2),
   serveStatic=process.env.SERVE_STATIC!=='false',
   allowedOrigins=(process.env.ALLOWED_ORIGINS || '').split(',').map(s=>s.trim()).filter(Boolean),
   multiplayerUrl=process.env.MULTIPLAYER_URL || '',

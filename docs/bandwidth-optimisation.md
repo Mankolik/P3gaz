@@ -4,6 +4,8 @@ Measured locally on 2026-09-24. Baseline: `97be5cf45e80b2fe71e1b020a64876a77f833
 
 ## Reproducible two-player test
 
+The current default is **2 Hz**, restored after the measurements below at the user's request. The recorded optimised run used **3 Hz**; it has not been rerun at 2 Hz. Simple proportional scaling suggests about 16 MB/hour at 2 Hz, but that is only an estimate because some traffic does not scale with snapshot frequency. To reproduce the recorded optimised configuration, set `SNAPSHOT_HZ=3` when running the benchmark.
+
 Same benchmark script, seed `20260924`, 100 aircraft, two real WebSocket clients, one-second warm-up and 30-second measurement window. Both clients consumed the final pause before the counters were read. The baseline script was run from a detached checkout of the baseline commit, with the same `ws` dependency. No static HTTP downloads are included in this test.
 
 | Measurement | Baseline | Optimised |
@@ -31,6 +33,8 @@ An actual HTTP request for `assets/geojson/WptsAbroad.geojson` measured:
 Other compressible static responses use the same bounded cache and conditional-response mechanism. Later, serving these files directly from Cloudflare will remove their downloads from Render altogether. No Cloudflare deployment is included in this change.
 
 ## Validation
+
+These results describe the original optimisation at 3 Hz, before the subsequent default-only change to 2 Hz.
 
 - `npm test`: **174 passing tests**, including the existing simulation/coordination suite and ten real WebSocket clients sharing 100 aircraft.
 - `npm run test:multiplayer`: passed with two isolated Chromium contexts.
