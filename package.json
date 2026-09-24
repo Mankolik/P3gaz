@@ -5,6 +5,8 @@
   "engines": {"node": ">=24 <25"},
   "scripts": {
     "start": "node server/index.js",
+    "build:static": "node scripts/build-static.mjs",
+    "benchmark:bandwidth": "node scripts/benchmark-bandwidth.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:multiplayer": "node tests/multiplayer.browser.cjs"
   },

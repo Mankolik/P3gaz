@@ -2,13 +2,24 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 (async()=>{
   const {createServer}=await import('../server/index.js'),{createTrack}=await import('../src/radar/tracks.js');
-  const app=await createServer();await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));let browser;
+  let frontend,staticHandler,frontendOrigin;
+  if(process.env.SPLIT_HOSTING==='1'){
+    frontend=require('node:http').createServer((req,res)=>staticHandler(req,res,new URL(req.url,'http://localhost')).catch(()=>{res.writeHead(404);res.end();}));
+    await new Promise(resolve=>frontend.listen(0,'127.0.0.1',resolve));frontendOrigin='http://127.0.0.1:'+frontend.address().port;
+  }
+  const app=await createServer({serveStatic:!frontend,allowedOrigins:frontend?[frontendOrigin]:[]});
+  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));let browser;
+  if(frontend){
+    const {createStaticHandler}=await import('../server/static.js');
+    staticHandler=createStaticHandler(require('node:path').resolve(__dirname,'..'),{multiplayerUrl:'ws://127.0.0.1:'+app.server.address().port+'/multiplayer'});
+  }
   try{
-    browser=await chromium.launch({headless:true,...(process.env.BROWSER_CHANNEL?{channel:process.env.BROWSER_CHANNEL}:{})});
+    browser=await chromium.launch({headless:true,...(process.env.BROWSER_CHANNEL?{channel:process.env.BROWSER_CHANNEL}:{}),
+      ...(process.env.BROWSER_EXECUTABLE_PATH?{executablePath:process.env.BROWSER_EXECUTABLE_PATH}:{})});
     const ca=await browser.newContext({viewport:{width:1440,height:950}}),cb=await browser.newContext({viewport:{width:1440,height:950}});
     const a=await ca.newPage(),b=await cb.newPage(),errors=[];
     for(const page of [a,b])page.on('pageerror',e=>errors.push(e.message));
-    const origin='http://127.0.0.1:'+app.server.address().port;
+    const origin=frontendOrigin || 'http://127.0.0.1:'+app.server.address().port;
     const open=page=>page.getByRole('button',{name:/^(Multiplayer|Room [A-Z0-9]+)$/}).click();
     const dialog=page=>page.getByRole('dialog',{name:'Multiplayer',exact:true});
     const close=page=>dialog(page).getByRole('button',{name:'Close',exact:true}).click();
@@ -62,8 +73,15 @@ const {chromium}=require('playwright');
     await open(b);assert.equal(await dialog(b).getByLabel('Your sector').locator('option').filter({hasText:'ALLFIR L'}).isDisabled(),true);
     await dialog(b).getByLabel('Your sector').selectOption('');await close(b);
     await b.waitForFunction(()=>document.querySelector('.track-label')?.classList.contains('status-unconcerned'));
+    // Exercise movement frames in actual browsers too, not only paused commands.
+    await la.locator('.level-primary button').click();await a.locator('.track-picker input').fill('350');await a.keyboard.press('Enter');
+    await open(a);await dialog(a).getByRole('button',{name:'Resume',exact:true}).click();await close(a);
+    await a.waitForFunction(()=>Number(document.querySelector('.level-afl .level-segment__value')?.textContent)>330,{},{timeout:15000});
+    await b.waitForFunction(()=>Number(document.querySelector('.level-afl .level-segment__value')?.textContent)>330,{},{timeout:15000});
+    await open(a);await dialog(a).getByRole('button',{name:'Pause',exact:true}).click();await close(a);
+    assert(t.actualFlightLevel>330);assert.equal(app.rooms.size,1);
     await open(a);await dialog(a).getByRole('button',{name:'Leave room',exact:true}).click();
     await b.waitForFunction(()=>document.querySelector('.multiplayer-message')?.textContent.includes('host left'));
-    assert.equal(app.rooms.size,0);assert.deepEqual(errors,[]);console.log('PASS: real two-player rooms, sector views, host assignment, human proposal colours and actions, DCT preview, withdrawal, and host disconnect.');
-  }finally{await browser?.close();await app.close();}
+    assert.equal(app.rooms.size,0);assert.deepEqual(errors,[]);console.log('PASS: real two-player rooms, sector views, host assignment, human proposal colours and actions, DCT preview, withdrawal, movement updates, and host disconnect; split hosting='+!!frontend+'.');
+  }finally{await browser?.close();await app.close();if(frontend)await new Promise(resolve=>frontend.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

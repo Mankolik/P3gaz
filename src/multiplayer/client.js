@@ -2,11 +2,13 @@ import { groupAirspace } from '../radar/sectorisation.js';
 import { playerSector, trackForPlayer } from './view.js';
 import { bindInstructionTransport } from '../radar/coordination.js';
 import { updateTrackMovement } from '../radar/movement.js';
+import { PROTOCOL_VERSION, createStateReceiver } from './protocol.js';
+import { multiplayerEndpoint } from './endpoint.js';
 
 export function createMultiplayerClient(state){
   const mp={connected:false,connecting:false,room:null,playerId:null,message:'',socket:null};
   state.multiplayer=mp;
-  const shared=new Map(),pending=new Map();let serial=0,local=null,configKey='';
+  const receiver=createStateReceiver(),shared=receiver.tracks,pending=new Map();let serial=0,local=null,configKey='',resyncing=false;
   const changed=()=>state.bus.emit('multiplayer:changed');
   const notice=message=>{mp.message=message;changed();};
   const request=(type,fields={})=>new Promise((resolve,reject)=>{
@@ -25,6 +27,8 @@ export function createMultiplayerClient(state){
       const target=previous.get(raw.id) || {},view=trackForPlayer(raw,sector,mp.playerId,mp.room.proposals);
       const presentation=Object.fromEntries(['labelOffset','labelSide','routeVisible','showGroundSpeed','showType'].filter(k=>Object.hasOwn(target,k)).map(k=>[k,target[k]]));
       const revision=(target.labelRevision || 0)+1;
+      // Remove fields deleted by a server patch while preserving local label preferences.
+      for(const key of Object.keys(target))delete target[key];
       Object.assign(target,view,presentation,{labelRevision:revision});
       target.control.accSectors=state.air.airspaceIndex.accSectors;
       if(target.directTo)target.directTo={...target.directTo,plan:target.flightPlan};
@@ -37,7 +41,7 @@ export function createMultiplayerClient(state){
     if(before!==sector)state.bus.emit('sectorisation:changed');
   }
   function disconnected(message){
-    mp.connected=false;mp.connecting=false;mp.room=null;mp.playerId=null;shared.clear();configKey='';
+    mp.connected=false;mp.connecting=false;mp.room=null;mp.playerId=null;receiver.reset();configKey='';resyncing=false;
     for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error(message));}pending.clear();
     if(local){Object.assign(state.air,local);local=null;state.bus.emit('sectorisation:changed');}
     notice(message);
@@ -45,20 +49,25 @@ export function createMultiplayerClient(state){
   mp.connect=async(mode,initials,code)=>{
     if(mp.connected || mp.connecting)throw Error('Already connected.');
     if(!state.air.airspaceIndex?.complete || !state.map.project)throw Error('Wait for the map to load.');
+    const url=multiplayerEndpoint(document.baseURI,globalThis.P3GAZ_CONFIG?.multiplayerUrl);
     mp.connecting=true;changed();
-    const url=new URL('multiplayer',document.baseURI);url.protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(url);mp.socket=socket;let endMessage='Disconnected from multiplayer.';
     socket.addEventListener('message',event=>{
-      const message=JSON.parse(event.data);
+      let message;
+      try{message=JSON.parse(event.data);}catch{endMessage='Invalid multiplayer response. Please reconnect.';socket.close();return;}
       if(message.type==='welcome'){
         local={tracks:state.air.tracks,sectorisation:state.air.sectorisation,controlledSector:state.air.controlledSector,airspaceIndex:state.air.airspaceIndex};
         state.air.tracks=[];mp.playerId=message.playerId;mp.connected=true;mp.connecting=false;mp.message='Joined as observer. Choose an available sector.';
         history.replaceState(null,'','#room='+message.code);
       }else if(message.type==='state'){
-        if(message.full)shared.clear();
-        for(const id of message.removed)shared.delete(id);
-        for(const {id,fields} of message.upserts)shared.set(id,Object.assign(shared.get(id) || {},fields));
-        mp.room=message.room;redrawViews();changed();
+        try{
+          if(!receiver.accept(message)){
+            if(!resyncing){resyncing=true;request('resync').catch(e=>{endMessage=e.message;socket.close();});}
+            return;
+          }
+          if(message.full)resyncing=false;
+          mp.room=receiver.room;redrawViews();changed();
+        }catch(error){endMessage=error.message;socket.close();}
       }else if(message.type==='ack'){
         const waiting=pending.get(message.id);if(waiting){clearTimeout(waiting.timer);pending.delete(message.id);message.error?waiting.reject(Error(message.error)):waiting.resolve();}
       }else if(message.type==='notice')notice(message.message);
@@ -71,7 +80,7 @@ export function createMultiplayerClient(state){
         socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});
         socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('Multiplayer server unavailable. Use the Render address.'));},{once:true});
       });
-      await request(mode,{initials,code,protocol:1});
+      await request(mode,{initials,code,protocol:PROTOCOL_VERSION});
     }catch(error){socket.close();mp.connecting=false;notice(error.message);throw error;}
   };
   mp.command=(type,fields)=>request(type,fields);

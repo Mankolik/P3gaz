@@ -12,3 +12,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: SNAPSHOT_HZ
+        value: "2"
