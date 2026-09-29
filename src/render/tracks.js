@@ -758,8 +758,6 @@ function updateLabelNode(node, track){
   node.transferRow.textContent = transferSector;
   node.transferRow.style.display = transferSector ? 'flex' : 'none';
   node.transferRow.dataset.direction = transfer.kind === 'outgoing' ? 'out' : transfer.kind === 'incoming' ? 'in' : '';
-  node.callsign.classList.toggle('transfer-in', transfer.kind === 'incoming');
-  node.callsign.classList.toggle('transfer-out', transfer.kind === 'outgoing');
   node.callsign.title = [
     transfer.kind === 'incoming' ? `Transfer from ${transfer.from}: click to accept or reject` : null,
     transfer.kind === 'outgoing' ? `Transfer to ${transfer.to} awaiting acceptance` : null,
