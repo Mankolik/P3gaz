@@ -14,6 +14,8 @@ export const TRANSFER_DISTANCE_NM=10;
 // itself. Another controller can derive a different label for the same track.
 export function statusForSector(track,sector){
   if(track.control?.owner===sector)return 'accepted';
+  // A receiver sees an offered aircraft as inbound until it accepts.
+  if(track.control?.transfer?.to===sector)return 'inbound';
   if((track.control?.activeSector ?? track.control?.physical)===sector)return 'intruder';
   const next=track.trajectory?.sequence.findIndex(visit=>visit.sector===sector) ?? -1;
   return next===1 ? 'inbound' : next>1 ? 'preinbound' : 'unconcerned';

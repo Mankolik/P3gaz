@@ -453,6 +453,8 @@ function createLabelNode(){
   root.title = 'R: toggle route display';
 
   const row0 = createRow('row0');
+  const transferRow = createRow('transfer-sector');
+  transferRow.style.display = 'none';
   const row1 = createRow('row1');
   const row2 = createRow('row2');
   const row3 = createRow('row3');
@@ -521,11 +523,12 @@ function createLabelNode(){
 
   row4.append(assignedHeading, assignedSpeed, assignedVertical, ecl);
 
-  root.append(row0, row1, row2, row3, row4);
+  root.append(row0, transferRow, row1, row2, row3, row4);
 
   const node = {
     root,
     row0,
+    transferRow,
     callsign,
     speedToggle,
     levels,
@@ -750,6 +753,11 @@ function updateLabelNode(node, track){
 
   node.callsign.textContent = track.callsign || 'UNKNOWN';
   const transfer = transferMenu(track);
+  // Sector name above the callsign: red where it is being sent, blue where it comes from.
+  const transferSector = transfer.kind === 'outgoing' ? transfer.to : transfer.kind === 'incoming' ? transfer.from : '';
+  node.transferRow.textContent = transferSector;
+  node.transferRow.style.display = transferSector ? 'flex' : 'none';
+  node.transferRow.dataset.direction = transfer.kind === 'outgoing' ? 'out' : transfer.kind === 'incoming' ? 'in' : '';
   node.callsign.classList.toggle('transfer-in', transfer.kind === 'incoming');
   node.callsign.classList.toggle('transfer-out', transfer.kind === 'outgoing');
   node.callsign.title = [

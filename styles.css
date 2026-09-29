@@ -216,3 +216,6 @@ footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; borde
 .track-picker__note{ color:var(--muted, #8a97a6); font-size:11px; letter-spacing:.3px; }
 .track-picker__option:disabled{ opacity:.45; cursor:default; background:transparent; }
 .track-picker__directional{ max-height:140px; }
+.track-label .transfer-sector{ letter-spacing:.5px; font-weight:600; }
+.track-label .transfer-sector[data-direction="out"]{ color:var(--track-red); }
+.track-label .transfer-sector[data-direction="in"]{ color:var(--track-blue); }

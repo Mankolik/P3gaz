@@ -81,6 +81,7 @@ test('player transfers need acceptance, update both views and cancel remote prop
   room.step(4);assert.equal(t.control.owner,'T L+H','a player receiver never accepts automatically');
   assert.throws(()=>transfer(room,a,t,'accept'),/not addressed/);
   assert.equal(trackForPlayer(t,'C L+H',b.id).control.transfer.to,'C L+H');
+  assert.equal(trackForPlayer(t,'C L+H',b.id).status,'inbound');assert.equal(trackForPlayer(t,'T L+H',a.id).status,'accepted');
   transfer(room,b,t,'accept');room.cancelInvalid();
   assert.equal(t.control.owner,'C L+H');assert.equal(trackForPlayer(t,'T L+H',a.id).status,'intruder');assert.equal(trackForPlayer(t,'C L+H',b.id).status,'accepted');
   assert.equal(room.proposals.length,0);t.lon=2.1;room.refresh();assert.equal(trackForPlayer(t,'T L+H',a.id).status,'unconcerned');

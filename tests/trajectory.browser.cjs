@@ -107,6 +107,8 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   await page.evaluate(()=>{const {t}=window.test;t.lon=-0.1;t.assignedHeading=90;window.test.render();});
   const callsign=label.locator('.callsign'),menu=page.locator('.track-picker--transfer');
   assert.match(await label.getAttribute('class'),/status-inbound/);assert.match(await callsign.getAttribute('class'),/transfer-in/);
+  const sectorTag=label.locator('.transfer-sector');
+  assert.equal(await sectorTag.textContent(),'EDU');assert.equal(await sectorTag.evaluate(e=>getComputedStyle(e).color),'rgb(34, 119, 255)');
   await callsign.click();
   assert.deepEqual(await menu.locator('button').allTextContents(),['Accept transfer','Reject transfer']);
   await menu.getByText('Accept transfer').click();await page.evaluate(()=>window.test.render());
@@ -117,11 +119,12 @@ window.test={t,state,render,advance(seconds){advanceTraffic(state,seconds);rende
   await callsign.click();
   assert.equal(await menu.getByText('No other player-controlled sectors').count(),1);
   await menu.getByText('Transfer → ESA').click();await page.evaluate(()=>window.test.render());
-  assert.match(await callsign.getAttribute('class'),/transfer-out/);
+  assert.match(await callsign.getAttribute('class'),/transfer-out/);assert.match(await label.getAttribute('class'),/status-accepted/);
+  assert.equal(await sectorTag.textContent(),'ESA');assert.equal(await sectorTag.evaluate(e=>getComputedStyle(e).color),'rgb(255, 102, 89)');
   await callsign.click();assert.deepEqual(await menu.locator('button').allTextContents(),['Undo transfer']);
   await page.keyboard.press('Escape');
   await page.evaluate(()=>window.test.advance(3));
-  assert.match(await label.getAttribute('class'),/status-intruder/);
+  assert.match(await label.getAttribute('class'),/status-intruder/);assert.equal(await sectorTag.isVisible(),false);
   await page.evaluate(()=>{window.test.t.lon=4.1;window.test.render();});assert.match(await label.getAttribute('class'),/status-unconcerned/);
   assert.deepEqual(await panel.locator('.elw-sector').allTextContents().then(a=>a.map(v=>v.split('/')[0])),['ESA']);
   await page.evaluate(()=>{window.test.t.trajectory={sequence:[],complete:false,reason:'Airspace data unavailable'};window.test.state.bus.emit('tick',0);});

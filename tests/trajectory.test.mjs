@@ -153,7 +153,8 @@ test('transfers use along-route distance, need manual acceptance and give differ
   requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.status,'accepted');
   t.lon=0.1;updateTrafficControl(s);assert.equal(t.status,'accepted');
   t.lon=3.9;updateTrafficControl(s,4);assert.equal(t.status,'accepted','the user transfers manually');
-  requestTransfer(t,'transfer');updateTrafficControl(s,3);assert.equal(t.status,'intruder');assert.equal(t.control.owner,'ESA');
+  requestTransfer(t,'transfer');updateTrafficControl(s,2);assert.equal(t.status,'accepted','the sender keeps it until acceptance');
+  assert.equal(statusForSector(t,'ESA'),'inbound');updateTrafficControl(s,1);assert.equal(t.status,'intruder');assert.equal(t.control.owner,'ESA');
   assert.equal(statusForSector(t,'ESA'),'accepted');
   t.lon=4.1;updateTrafficControl(s);assert.equal(t.status,'unconcerned');
   setFlightPlan(t,[{name:'BACK',lon:2,lat:0}]);updateTrafficControl(s);
@@ -166,7 +167,8 @@ test('the user can reject an inbound offer and undo an outbound transfer before 
   t.lon=-0.1;updateTrafficControl(s);requestTransfer(t,'reject');
   assert.equal(t.control.transfer,null);updateTrafficControl(s,10);assert.equal(t.control.transfer,null,'not re-offered in the same visit');
   assert.equal(t.control.owner,'EDU');
-  t.lon=0.1;updateTrafficControl(s);assert.equal(t.status,'intruder');assert.equal(t.control.transfer.to,'ALLFIR','offered again on entry');
+  t.lon=0.1;updateTrafficControl(s);assert.equal(t.control.transfer.to,'ALLFIR','offered again on entry');
+  assert.equal(t.status,'inbound','an offered aircraft stays inbound for the receiver even inside the sector');
   requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.control.owner,'ALLFIR');
   assert.equal(requestTransfer(t,'directional','ESA'),false,'directional transfer needs a player sector');
   requestTransfer(t,'transfer');updateTrafficControl(s,2);assert(requestTransfer(t,'undo'));
@@ -275,7 +277,7 @@ test('an obsolete shortcut proposal cannot be applied to a replacement flight pl
 test('rerouting away from an imminent exit cancels that transfer; short visits do not bounce ownership',()=>{
   const t=track(3.9),s=state(t);updateTrafficControl(s);
   assert.equal(t.status,'accepted');requestTransfer(t,'transfer');updateTrafficControl(s,3);assert.equal(t.status,'intruder');
-  setFlightPlan(t,[{name:'STAY',lon:2,lat:0}]);updateTrafficControl(s);assert.equal(t.status,'intruder');
+  setFlightPlan(t,[{name:'STAY',lon:2,lat:0}]);updateTrafficControl(s);assert.equal(t.status,'inbound','offered back to the user');
   assert.equal(t.control.transfer.to,'ALLFIR');requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.status,'accepted');
   const shortIndex=index();shortIndex.epww[0].polygons[0].rings=[ring(0,0.1)];
   const fast=track(-0.01),ss=state(fast,shortIndex);updateTrafficControl(ss);requestTransfer(fast,'accept');updateTrafficControl(ss);assert.equal(fast.status,'accepted');
