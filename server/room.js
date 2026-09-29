@@ -7,6 +7,7 @@ import { assignClearedLevel, assignVerticalRate } from '../src/radar/clearances.
 import { aircraftCeiling } from '../src/radar/performance.js';
 import { limitSpeedInstruction } from '../src/radar/speed-control.js';
 import { proposalKey } from '../src/radar/coordination.js';
+import { nextTransferSector, offerTransfer, completeTransfer, rejectTransfer, cancelTransfer } from '../src/radar/transfers.js';
 import { updateSharedTraffic, advanceSharedTraffic } from '../src/multiplayer/shared-traffic.js';
 
 const finite=(value,min,max)=>Number.isFinite(value) && value>=min && value<=max;
@@ -60,6 +61,7 @@ export class Room {
       this.paused=message.paused;this.speed=message.speed;return;
     }
     if(message.type==='proposal'){this.resolve(player,message.proposalId,message.decision);return;}
+    if(message.type==='transfer'){this.transfer(player,message);return;}
     if(message.type!=='instruction')throw Error('Unknown command.');
     const sector=this.sector(player);if(!sector)throw Error('Select a sector before issuing instructions.');
     const t=this.state.air.tracks.find(t=>t.id===message.trackId);if(!t)throw Error('Aircraft is no longer available.');
@@ -78,6 +80,29 @@ export class Room {
     this.proposals=this.proposals.filter(p=>!(p.sender===player.id && p.trackId===t.id && p.key===key));
     this.proposals.push({id:randomUUID(),trackId:t.id,kind,key,value,sender:player.id,senderSector:sector,
       recipient:recipient?.id || null,owner:target,visit:t.control.visit,due:recipient?null:this.time+3});
+  }
+  transfer(player,{trackId,action,sector}){
+    const me=this.sector(player);if(!me)throw Error('Select a sector before transferring aircraft.');
+    const t=this.state.air.tracks.find(t=>t.id===trackId);if(!t)throw Error('Aircraft is no longer available.');
+    const c=t.control,pending=c.transfer,human=s=>this.state.air.humanSectors.has(s);
+    const tell=(sector,text)=>{const p=this.controller(sector);if(p && p.id!==player.id)this.notify(p.id,`${t.callsign}: ${text}`);};
+    if(action==='transfer' || action==='directional'){
+      if(c.owner!==me)throw Error('Only the controlling sector can transfer this aircraft.');
+      if(pending)throw Error('A transfer is already pending for this aircraft.');
+      const to=action==='transfer' ? nextTransferSector(t) : sector;
+      if(action==='directional' && (to===me || !this.controller(to)))throw Error('Choose a sector controlled by another player.');
+      if(!to)throw Error('No next sector is available.');
+      offerTransfer(t,to,{directional:action==='directional',initiator:'controller',human});
+      tell(to,`transfer offered by ${me}`);
+    }else if(action==='accept' || action==='reject'){
+      if(pending?.to!==me)throw Error('That transfer is not addressed to your sector.');
+      if(action==='accept')completeTransfer(t);else rejectTransfer(t);
+      tell(pending.from,`transfer ${action==='accept'?'accepted':'rejected'} by ${me}`);
+    }else if(action==='undo'){
+      if(pending?.from!==me || pending.initiator!=='controller')throw Error('There is no transfer of yours to undo.');
+      cancelTransfer(t);tell(pending.to,`transfer withdrawn by ${me}`);
+    }else throw Error('Unknown transfer action.');
+    this.refresh();this.cancelInvalid();
   }
   validate(t,kind,value){
     if(['clearedFlightLevel','exitFlightLevel','plannedEntryLevel','expectedCruiseLevel'].includes(kind)){
@@ -177,7 +202,7 @@ export class Room {
       if(retained && sectorName(retained.members)===physical)levels[physical]=t.sectorExitLevels?.[t.control.owner] ?? null;
       t.sectorExitLevels=levels;t.coordinationRevision=(t.coordinationRevision || 0)+1;
       Object.assign(t.control,{physical,activeSector:physical,owner:physical,visit:t.control.visit+1,retainPhysicalVisit:true,
-        reconfiguredAt:t.control.time,enteredAt:t.control.time,sentTo:null,computerSector:t.isDeparture?null:physical,
+        reconfiguredAt:t.control.time,enteredAt:t.control.time,sentTo:null,transfer:null,rejected:null,computerSector:t.isDeparture?null:physical,
         computerTargetLevel:t.isDeparture?null:t.clearedFlightLevel});
     }
     for(const p of this.players.values())p.sectorId=assignments[p.id];

@@ -9,6 +9,7 @@ import { setFlightPlan } from '../src/radar/routes.js';
 import { updateTrafficControl } from '../src/radar/traffic-control.js';
 import { buildTrajectory } from '../src/radar/trajectory.js';
 import { issueInstruction } from '../src/radar/coordination.js';
+import { requestTransfer } from '../src/radar/transfers.js';
 import { extendedSectorSequence } from '../src/ui/panels/extended-label-data.js';
 import { controlledFootprint } from '../src/render/sector-footprint.js';
 
@@ -131,7 +132,8 @@ test('computer departures follow ECL across remote groups; PEL restricts only th
   assert.equal(t.trajectory.sequence.find(v=>v.sector==='C L+H').targetLevel,250);
   t.lon=2.2;updateTrafficControl(s);assert.equal(t.clearedFlightLevel,250);
   assert.equal(t.plannedEntryLevel,250);
-  t.lon=4.2;updateTrafficControl(s);assert.equal(t.control.owner,'J L+H');
+  t.lon=4.2;updateTrafficControl(s);assert.equal(t.control.owner,'C L+H');assert.equal(t.control.transfer.to,'J L+H');
+  requestTransfer(t,'accept');assert.equal(t.control.owner,'J L+H');
   assert.equal(t.clearedFlightLevel,250,'actual clearance stays under user control');
   assert.equal(t.trajectory.sequence[0].targetLevel,360,'unfilled user XFL predicts ECL');
 });

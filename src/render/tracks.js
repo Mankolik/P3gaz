@@ -4,6 +4,7 @@ import { navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 import { aircraftCeiling } from '../radar/performance.js';
 import { issueInstruction, proposedDisplayTrack } from '../radar/coordination.js';
+import { requestTransfer, transferMenu } from '../radar/transfers.js';
 import { limitSpeedInstruction, speedLimits, speedMode } from '../radar/speed-control.js';
 
 const STATUS_COLORS = {
@@ -452,6 +453,8 @@ function createLabelNode(){
   root.title = 'R: toggle route display';
 
   const row0 = createRow('row0');
+  const transferRow = createRow('transfer-sector');
+  transferRow.style.display = 'none';
   const row1 = createRow('row1');
   const row2 = createRow('row2');
   const row3 = createRow('row3');
@@ -520,11 +523,12 @@ function createLabelNode(){
 
   row4.append(assignedHeading, assignedSpeed, assignedVertical, ecl);
 
-  root.append(row0, row1, row2, row3, row4);
+  root.append(row0, transferRow, row1, row2, row3, row4);
 
   const node = {
     root,
     row0,
+    transferRow,
     callsign,
     speedToggle,
     levels,
@@ -574,6 +578,14 @@ function createLabelNode(){
       }
     });
   },true);
+
+  callsign.addEventListener('click', evt=>{
+    if(evt.button!==0) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openTransferMenu(node, callsign);
+  });
 
   speedToggle.addEventListener('click', evt=>{
     evt.preventDefault();
@@ -740,7 +752,17 @@ function updateLabelNode(node, track){
   }
 
   node.callsign.textContent = track.callsign || 'UNKNOWN';
-  node.callsign.title = sectorMembershipTitle(track.sectorMembership);
+  const transfer = transferMenu(track);
+  // Sector name above the callsign: red where it is being sent, blue where it comes from.
+  const transferSector = transfer.kind === 'outgoing' ? transfer.to : transfer.kind === 'incoming' ? transfer.from : '';
+  node.transferRow.textContent = transferSector;
+  node.transferRow.style.display = transferSector ? 'flex' : 'none';
+  node.transferRow.dataset.direction = transfer.kind === 'outgoing' ? 'out' : transfer.kind === 'incoming' ? 'in' : '';
+  node.callsign.title = [
+    transfer.kind === 'incoming' ? `Transfer from ${transfer.from}: click to accept or reject` : null,
+    transfer.kind === 'outgoing' ? `Transfer to ${transfer.to} awaiting acceptance` : null,
+    sectorMembershipTitle(track.sectorMembership),
+  ].filter(Boolean).join('\n');
   node.root.dataset.sectors = (track.sectorMembership?.sectors || []).map(sector=>sector.id).join(' ');
   node.root.dataset.sectorStatus = track.sectorMembership?.status || 'unknown';
 
@@ -895,6 +917,48 @@ export function syncTrackLabels(overlay, projected, navigationIndex){
     }
   }
   return anchors;
+}
+
+function openTransferMenu(node, anchor){
+  const track = node.track;
+  const menu = transferMenu(track);
+  const items = menu.kind === 'incoming' ? [['Accept transfer','accept'],['Reject transfer','reject']]
+    : menu.kind === 'outgoing' && menu.undo ? [['Undo transfer','undo']]
+    : menu.kind === 'owned' ? [['Transfer','transfer']] : [];
+  if(!items.length) return;
+  showTrackPicker(node, anchor, 'track-picker--transfer', (panel, close)=>{
+    const option = (label, onClick, disabled=false)=>{
+      const button = createPickerOption(label, false);
+      button.disabled = disabled;
+      button.addEventListener('click', evt=>{
+        evt.preventDefault();
+        evt.stopPropagation();
+        onClick(button);
+      });
+      panel.append(button);
+      return button;
+    };
+    const act = (action, sector=null)=>()=>{
+      requestTransfer(track, action, sector);
+      close();
+      updateLabelNode(node, track);
+    };
+    for(const [label, action] of items){
+      const button = option(label, act(action), action === 'transfer' && !menu.next);
+      button.dataset.action = action;
+      if(action === 'transfer' && menu.next) button.title = `To ${menu.next}`;
+    }
+    if(menu.kind !== 'owned') return;
+    // Player sectors are listed only once directional transfer is chosen.
+    const directional = option('Directional transfer', button=>{
+      button.classList.add('selected');
+      button.disabled = true;
+      for(const sector of menu.directional){
+        option(sector, act('directional', sector)).classList.add('track-picker__option--sector');
+      }
+    }, !menu.directional.length);
+    directional.dataset.action = 'directional-menu';
+  });
 }
 
 function closeActivePicker(){

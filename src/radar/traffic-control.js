@@ -5,6 +5,7 @@ import { updateTrackMovement } from './movement.js';
 import { assignClearedLevel } from './clearances.js';
 import { updateArrivalControl } from './procedure-guidance.js';
 import { removeFinishedTraffic } from './traffic-lifecycle.js';
+import { advanceTransfer, offerTransfer, transferRejected } from './transfers.js';
 
 const cache=new WeakMap();
 export const TRANSFER_DISTANCE_NM=10;
@@ -13,6 +14,8 @@ export const TRANSFER_DISTANCE_NM=10;
 // itself. Another controller can derive a different label for the same track.
 export function statusForSector(track,sector){
   if(track.control?.owner===sector)return 'accepted';
+  // A receiver sees an offered aircraft as inbound until it accepts.
+  if(track.control?.transfer?.to===sector)return 'inbound';
   if((track.control?.activeSector ?? track.control?.physical)===sector)return 'intruder';
   const next=track.trajectory?.sequence.findIndex(visit=>visit.sector===sector) ?? -1;
   return next===1 ? 'inbound' : next>1 ? 'preinbound' : 'unconcerned';
@@ -59,8 +62,12 @@ export function updateTrafficControl(state,seconds=0){
     if(active!==c.activeSector){
       const previousActive=c.activeSector;
       c.activeSector=active;c.visit++;c.retainPhysicalVisit=true;
-      if(active===controlled){c.hasEntered=true;c.enteredAt=c.time;c.owner=controlled;c.sentTo=null;}
-      else if(previousActive===controlled || c.owner===previousActive){c.owner=active;c.sentTo=null;}
+      if(active===controlled){c.hasEntered=true;c.enteredAt=c.time;}
+      // Computer sectors hand over among themselves, and take an aircraft the
+      // user never transferred once it has left; the user accepts manually.
+      else if(c.owner===controlled ? !track.trajectory.sequence.some(v=>v.sector===controlled) : c.owner===previousActive){
+        c.owner=active;c.sentTo=null;
+      }
       track.labelRevision=(track.labelRevision || 0)+1;
     }
     // Omitted physical visits neither take ownership nor issue clearances.
@@ -81,24 +88,24 @@ export function updateTrafficControl(state,seconds=0){
       track.plannedEntryLevel=entry>0 ? visits[entry-1].targetLevel : track.plannedEntryLevel;
     }
     const travelled=old && old===cache.get(track) ? distanceNm(old.position,track) : 0;
+    const human=sector=>sector===controlled;
+    const plannedOwner=visits.some(v=>v.sector===c.owner);
     if(c.reconfiguredAt!=null && c.time-c.reconfiguredAt<3){
       // Reconfiguration transfers by current position, without immediately
       // undoing that decision through the normal early-transfer window.
+    }else if(c.owner===controlled){
+      // Without a manual transfer, the user keeps the aircraft until it has
+      // left for computer airspace for good.
+      if(!human(active) && !plannedOwner && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;c.transfer=null;}
     }else if(active===controlled){
-      const next=visits[0]?.sector===controlled ? visits[1] : null;
-      if(next && next.sector!=='UNKNOWN' && next.entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM && c.time-c.enteredAt>=3){
-        c.owner=next.sector;c.sentTo=next.sector;
-      }else if(c.sentTo && (!next || next.sector!==c.sentTo)){
-        c.owner=controlled;c.sentTo=null;
-      }
+      if(!plannedOwner && !transferRejected(track,controlled))offerTransfer(track,controlled,{human});
     }else{
+      if(!plannedOwner && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;}
       const entry=visits.findIndex(v=>v.sector===controlled);
-      if(entry===1 && visits[entry].entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM){
-        c.owner=controlled;
-      }else if(c.owner===controlled && entry===-1){
-        c.owner=active;
-      }
+      if(entry===1 && c.owner===active && visits[entry].entry.distanceNm-travelled<=TRANSFER_DISTANCE_NM
+        && !transferRejected(track,controlled))offerTransfer(track,controlled,{human});
     }
+    advanceTransfer(track,human);
     // A transfer invalidates outstanding proposals to the previous owner.
     updateArrivalControl(state,track);
     advanceProposals(track);

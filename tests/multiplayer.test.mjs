@@ -72,10 +72,42 @@ test('computer proposals keep three-second acceptance; human claiming target can
   instruction(room,b,t,'heading',180);room.command(a.id,{type:'claim',sectorId:room.config.groups.find(g=>sectorName(g.members)==='T L+H').id});
   room.step(4);assert.equal(t.assignedHeading,null);assert.equal(room.proposals.length,0);
 });
-test('automatic transfer updates both views; remote proposals cannot survive ownership changes',()=>{
-  const {room,a,b,t}=setup();room.step(4);instruction(room,b,t,'heading',180);instruction(room,b,t,'plannedEntryLevel',360);assert.equal(room.proposals.length,2);t.lon=1.9;room.refresh();room.cancelInvalid();
+const transfer=(r,p,t,action,sector)=>r.command(p.id,{type:'transfer',trackId:t.id,action,sector});
+test('player transfers need acceptance, update both views and cancel remote proposals on ownership change',()=>{
+  const {room,a,b,t}=setup();room.step(4);instruction(room,b,t,'heading',180);instruction(room,b,t,'plannedEntryLevel',360);assert.equal(room.proposals.length,2);
+  t.lon=1.9;room.refresh();room.step(4);assert.equal(t.control.owner,'T L+H','no automatic transfer between players');
+  assert.throws(()=>transfer(room,b,t,'transfer'),/controlling sector/);
+  transfer(room,a,t,'transfer');assert.deepEqual([t.control.transfer.from,t.control.transfer.to],['T L+H','C L+H']);
+  room.step(4);assert.equal(t.control.owner,'T L+H','a player receiver never accepts automatically');
+  assert.throws(()=>transfer(room,a,t,'accept'),/not addressed/);
+  assert.equal(trackForPlayer(t,'C L+H',b.id).control.transfer.to,'C L+H');
+  assert.equal(trackForPlayer(t,'C L+H',b.id).status,'inbound');assert.equal(trackForPlayer(t,'T L+H',a.id).status,'accepted');
+  transfer(room,b,t,'accept');room.cancelInvalid();
   assert.equal(t.control.owner,'C L+H');assert.equal(trackForPlayer(t,'T L+H',a.id).status,'intruder');assert.equal(trackForPlayer(t,'C L+H',b.id).status,'accepted');
   assert.equal(room.proposals.length,0);t.lon=2.1;room.refresh();assert.equal(trackForPlayer(t,'T L+H',a.id).status,'unconcerned');
+});
+test('receivers can reject, senders can undo, and directional transfers target only player sectors',()=>{
+  const {room,a,b,t,messages}=setup();
+  transfer(room,a,t,'transfer');assert.throws(()=>transfer(room,a,t,'transfer'),/already pending/);
+  assert.throws(()=>transfer(room,b,t,'undo'),/no transfer/);
+  transfer(room,b,t,'reject');assert.equal(t.control.transfer,null);assert.equal(t.control.owner,'T L+H');
+  assert(messages.some(m=>m.type==='notice' && /rejected by C L\+H/.test(m.message)));
+  transfer(room,a,t,'transfer');transfer(room,a,t,'undo');assert.equal(t.control.transfer,null);
+  assert.throws(()=>transfer(room,b,t,'accept'),/not addressed/);
+  assert.throws(()=>transfer(room,a,t,'directional','ESA'),/controlled by another player/);
+  assert.throws(()=>transfer(room,a,t,'directional','T L+H'),/controlled by another player/);
+  transfer(room,a,t,'directional','C L+H');assert.equal(t.control.transfer.directional,true);
+  transfer(room,b,t,'accept');assert.equal(t.control.owner,'C L+H');
+});
+test('computer sectors offer aircraft to players and accept player transfers after three seconds',()=>{
+  const {room,a,b,t}=setup();room.command(b.id,{type:'claim',sectorId:null});
+  transfer(room,a,t,'transfer');assert.equal(t.control.transfer.to,'C L+H');
+  room.step(2.9);assert.equal(t.control.owner,'T L+H');room.step(.2);assert.equal(t.control.owner,'C L+H');
+  const u=setup();u.room.command(u.a.id,{type:'claim',sectorId:null});u.room.step(4);
+  assert.equal(u.t.control.owner,'T L+H');assert.equal(u.t.control.transfer,undefined);
+  u.t.lon=1.9;u.room.step(4);assert.equal(u.t.control.transfer.to,'C L+H');assert.equal(u.t.control.transfer.from,'T L+H');
+  u.room.step(30);assert.equal(u.t.control.owner,'T L+H','players accept computer offers manually');
+  transfer(u.room,u.b,u.t,'accept');assert.equal(u.t.control.owner,'C L+H');
 });
 test('host reconfiguration assigns all affected players atomically and preserves clearances for retained controller',()=>{
   const {room,a,b,t,left,right}=setup();instruction(room,a,t,'exitFlightLevel',360);

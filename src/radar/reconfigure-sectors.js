@@ -36,7 +36,7 @@ export function applySectorisation(state,draft){
     track.control={...c,sector:controlled,physical,activeSector:physical,owner:physical,
       sectorised:true,accSectors:index.accSectors,retainPhysicalVisit:true,time,pending:{},
       visit:(c?.visit || 0)+1,hasEntered:physical===controlled,enteredAt:physical===controlled?time:null,
-      reconfiguredAt:time,sentTo:null,computerSector:track.isDeparture ? null : physical,
+      reconfiguredAt:time,sentTo:null,transfer:null,rejected:null,computerSector:track.isDeparture ? null : physical,
       computerTargetLevel:track.isDeparture ? null : track.clearedFlightLevel};
     if(Object.keys(c?.pending || {}).length)track.coordinationMessage='Proposal cancelled: sector configuration changed';
     track.coordinationRevision=(track.coordinationRevision || 0)+1;
