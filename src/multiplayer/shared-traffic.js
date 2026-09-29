@@ -4,6 +4,7 @@ import { updateTrackMovement } from '../radar/movement.js';
 import { assignClearedLevel } from '../radar/clearances.js';
 import { updateArrivalControl } from '../radar/procedure-guidance.js';
 import { removeFinishedTraffic } from '../radar/traffic-lifecycle.js';
+import { advanceTransfer, offerTransfer, transferRejected } from '../radar/transfers.js';
 
 const cache=new WeakMap();
 export function updateSharedTraffic(state,seconds=0){
@@ -22,12 +23,30 @@ export function updateSharedTraffic(state,seconds=0){
     const old=cache.get(t);
     if(!old || old.index!==index || old.key!==signature() || c.time-old.time>=5 || distanceNm(old,t)>=.5 || Math.abs(old.level-t.actualFlightLevel)>=1)refresh();
     const active=t.trajectory.sequence[0]?.sector || physical;
-    if(c.activeSector!==active){c.activeSector=active;c.owner=active;c.visit++;c.enteredAt=c.time;c.sentTo=null;c.retainPhysicalVisit=true;}
-    const saved=cache.get(t),travelled=distanceNm(saved,t),next=t.trajectory.sequence[1];
-    if(c.reconfiguredAt==null || c.time-c.reconfiguredAt>=3){
-      if(next && next.sector!=='UNKNOWN' && next.entry.distanceNm-travelled<=10 && c.time-c.enteredAt>=3){c.owner=next.sector;c.sentTo=next.sector;}
-      else if(c.sentTo && (!next || next.sector!==c.sentTo)){c.owner=active;c.sentTo=null;}
+    const human=sector=>humans.has(sector);
+    if(c.activeSector!==active){
+      const previous=c.activeSector;
+      c.activeSector=active;c.visit++;c.enteredAt=c.time;c.retainPhysicalVisit=true;
+      // Only computer sectors hand over automatically, and never to a player.
+      if(!human(c.owner) && c.owner===previous && !human(active)){c.owner=active;c.sentTo=null;}
     }
+    const saved=cache.get(t),travelled=distanceNm(saved,t),sequence=t.trajectory.sequence,next=sequence[1];
+    const planned=sequence.some(v=>v.sector===c.owner);
+    if(c.reconfiguredAt==null || c.time-c.reconfiguredAt>=3){
+      if(human(c.owner)){
+        // A player keeps an untransferred aircraft until it has left for computer airspace.
+        if(!human(active) && !planned && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;}
+      }else if(human(active)){
+        if(!planned && !transferRejected(t,active))offerTransfer(t,active,{human});
+      }else{
+        if(!planned && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;}
+        if(c.owner===active && next && next.sector!=='UNKNOWN' && next.entry.distanceNm-travelled<=10 && c.time-c.enteredAt>=3){
+          if(!human(next.sector)){c.owner=next.sector;c.sentTo=next.sector;}
+          else if(!transferRejected(t,next.sector))offerTransfer(t,next.sector,{human});
+        }else if(c.sentTo && c.owner===c.sentTo && (!next || next.sector!==c.sentTo)){c.owner=active;c.sentTo=null;}
+      }
+    }
+    advanceTransfer(t,human);
     const target=sectorTargetLevel(t,active,t.clearedFlightLevel ?? t.actualFlightLevel);
     updateArrivalControl(state,t);
     if(!t.arrivalManaged && !humans.has(active) && !humans.has(c.owner) && active!=='UNKNOWN'){

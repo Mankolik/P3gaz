@@ -1,6 +1,7 @@
 import { groupAirspace } from '../radar/sectorisation.js';
 import { playerSector, trackForPlayer } from './view.js';
 import { bindInstructionTransport } from '../radar/coordination.js';
+import { bindTransferTransport } from '../radar/transfers.js';
 import { updateTrackMovement } from '../radar/movement.js';
 import { PROTOCOL_VERSION, createStateReceiver } from './protocol.js';
 import { multiplayerEndpoint } from './endpoint.js';
@@ -23,6 +24,7 @@ export function createMultiplayerClient(state){
     const nextKey=JSON.stringify(mp.room.config);
     if(configKey!==nextKey){configKey=nextKey;state.air.sectorisation=mp.room.config;state.air.airspaceIndex=groupAirspace(state.air.airspaceIndex,mp.room.config);}
     const previous=new Map(state.air.tracks.map(t=>[t.id,t]));
+    const humanSectors=mp.room.players.map(p=>playerSector(mp.room,p.id)).filter(Boolean);
     state.air.tracks=[...shared.values()].map(raw=>{
       const target=previous.get(raw.id) || {},view=trackForPlayer(raw,sector,mp.playerId,mp.room.proposals);
       const presentation=Object.fromEntries(['labelOffset','labelSide','routeVisible','showGroundSpeed','showType'].filter(k=>Object.hasOwn(target,k)).map(k=>[k,target[k]]));
@@ -31,9 +33,11 @@ export function createMultiplayerClient(state){
       for(const key of Object.keys(target))delete target[key];
       Object.assign(target,view,presentation,{labelRevision:revision});
       target.control.accSectors=state.air.airspaceIndex.accSectors;
+      target.control.humanSectors=humanSectors;
       if(target.directTo)target.directTo={...target.directTo,plan:target.flightPlan};
       const [x,y]=state.map.project(target.lon,target.lat);target.x=x;target.y=y;
       bindInstructionTransport(target,(kind,value)=>{request('instruction',{trackId:target.id,kind,value}).catch(e=>notice(e.message));return true;});
+      bindTransferTransport(target,(action,sector)=>{request('transfer',{trackId:target.id,action,sector}).catch(e=>notice(e.message));return true;});
       target.respondProposal=(proposalId,decision)=>request('proposal',{proposalId,decision}).catch(e=>notice(e.message));
       return target;
     });

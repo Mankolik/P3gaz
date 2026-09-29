@@ -19,7 +19,8 @@ function wireValue(value,key){
 export function wireTrack(track){
   const {x,y,vector,vectorDx,vectorDy,sectorMembership,labelRevision,...copy}=track;
   if(track.control)copy.control={shared:true,sectorised:true,physical:track.control.physical,
-    activeSector:track.control.activeSector,owner:track.control.owner,hasEnteredFir:track.control.hasEnteredFir,visit:track.control.visit};
+    activeSector:track.control.activeSector,owner:track.control.owner,hasEnteredFir:track.control.hasEnteredFir,visit:track.control.visit,
+    transfer:track.control.transfer ? {...track.control.transfer} : null};
   // Multiplayer renders sector crossings/levels; integration samples, exit
   // distances and prediction clocks are used only by the authoritative server.
   if(track.trajectory)copy.trajectory={complete:track.trajectory.complete,reason:track.trajectory.reason,

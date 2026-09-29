@@ -8,6 +8,7 @@ import {routeDisplayPoints} from '../src/render/route-display.js';
 import {setFlightPlan,assignHeading,assignDirectTo} from '../src/radar/routes.js';
 import {updateTrafficControl,advanceTraffic,statusForSector} from '../src/radar/traffic-control.js';
 import {issueInstruction} from '../src/radar/coordination.js';
+import {requestTransfer,nextTransferSector} from '../src/radar/transfers.js';
 
 const ring=(a,b)=>[[a,-1],[b,-1],[b,1],[a,1],[a,-1]];
 const feature=(properties,a,b)=>({type:'Feature',properties,geometry:{type:'Polygon',coordinates:[ring(a,b)]}});
@@ -100,8 +101,10 @@ test('inbound transfers ignore a short ALLFIR island and use the intended entry 
   assert.equal(t.control.owner,'EDU');assert.equal(t.status,'inbound');assert.equal(t.control.visit,visit);
   assert.equal(t.clearedFlightLevel,cfl);
   t.lon=0.05;updateTrafficControl(s);assert.equal(t.control.owner,'EDU');
-  t.lon=0.82;updateTrafficControl(s);assert.equal(t.control.owner,'EDU');
-  t.lon=0.84;updateTrafficControl(s);assert.equal(t.control.owner,'ALLFIR');
+  t.lon=0.82;updateTrafficControl(s);assert.equal(t.control.owner,'EDU');assert.equal(t.control.transfer,undefined);
+  t.lon=0.84;updateTrafficControl(s,60);assert.equal(t.control.owner,'EDU','the user must accept the transfer');
+  assert.equal(t.control.transfer.to,'ALLFIR');assert.equal(t.control.transfer.from,'EDU');
+  assert(requestTransfer(t,'accept'));assert.equal(t.control.owner,'ALLFIR');
   t.lon=1.01;updateTrafficControl(s);assert.equal(t.control.activeSector,'ALLFIR');
 });
 
@@ -110,7 +113,10 @@ test('outbound transfer bypasses a short TMA, keeps ownership through it and doe
   updateTrafficControl(s);updateTrafficControl(s,4);
   assert.deepEqual(sectors(t.trajectory),['ALLFIR','ESA']);
   assert.equal(t.control.owner,'ALLFIR','ten miles before the short TMA is too early for ESA');
-  t.lon=3.84;updateTrafficControl(s);assert.equal(t.control.owner,'ESA');
+  t.lon=3.84;updateTrafficControl(s,60);assert.equal(t.control.owner,'ALLFIR','no automatic outbound transfer');
+  assert.equal(nextTransferSector(t),'ESA');assert(requestTransfer(t,'transfer'));
+  updateTrafficControl(s,2.9);assert.equal(t.control.owner,'ALLFIR');assert.equal(t.control.transfer.to,'ESA');
+  updateTrafficControl(s,0.1);assert.equal(t.control.owner,'ESA','computer sectors accept after three seconds');
   const visit=t.control.visit,cfl=t.clearedFlightLevel;
   t.lon=3.86;updateTrafficControl(s);assert.equal(t.control.physical,'APWA');
   assert.equal(t.control.activeSector,'ALLFIR');assert.equal(t.control.owner,'ESA');
@@ -139,15 +145,33 @@ test('computer-sector level changes update the profile immediately and boundary 
   assert.equal(t.control.pending.speed,undefined);assert.equal(t.assignedSpeed,undefined);
 });
 
-test('automatic transfers use along-route distance and give different sector-relative labels',()=>{
-  const t=track(),s=state(t);updateTrafficControl(s);assert.equal(t.status,'inbound');
-  t.lon=-0.1;updateTrafficControl(s);assert.equal(t.status,'accepted');assert.equal(t.control.physical,'EDU');
+test('transfers use along-route distance, need manual acceptance and give different sector-relative labels',()=>{
+  const t=track(),s=state(t);updateTrafficControl(s);assert.equal(t.status,'inbound');assert.equal(t.control.transfer,undefined);
+  t.lon=-0.1;updateTrafficControl(s,30);assert.equal(t.status,'inbound');assert.equal(t.control.physical,'EDU');
+  assert.equal(t.control.transfer.to,'ALLFIR');
+  assert.equal(requestTransfer(t,'undo'),false,'the receiver cannot undo a computer offer');
+  requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.status,'accepted');
   t.lon=0.1;updateTrafficControl(s);assert.equal(t.status,'accepted');
-  t.lon=3.9;updateTrafficControl(s,4);assert.equal(t.status,'intruder');assert.equal(t.control.owner,'ESA');
+  t.lon=3.9;updateTrafficControl(s,4);assert.equal(t.status,'accepted','the user transfers manually');
+  requestTransfer(t,'transfer');updateTrafficControl(s,3);assert.equal(t.status,'intruder');assert.equal(t.control.owner,'ESA');
   assert.equal(statusForSector(t,'ESA'),'accepted');
   t.lon=4.1;updateTrafficControl(s);assert.equal(t.status,'unconcerned');
   setFlightPlan(t,[{name:'BACK',lon:2,lat:0}]);updateTrafficControl(s);
-  assert.equal(t.status,'accepted','return within ten miles can be accepted again');
+  assert.equal(t.control.transfer.to,'ALLFIR','return within ten miles is offered again');
+  requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.status,'accepted');
+});
+
+test('the user can reject an inbound offer and undo an outbound transfer before acceptance',()=>{
+  const t=track(),s=state(t);updateTrafficControl(s);
+  t.lon=-0.1;updateTrafficControl(s);requestTransfer(t,'reject');
+  assert.equal(t.control.transfer,null);updateTrafficControl(s,10);assert.equal(t.control.transfer,null,'not re-offered in the same visit');
+  assert.equal(t.control.owner,'EDU');
+  t.lon=0.1;updateTrafficControl(s);assert.equal(t.status,'intruder');assert.equal(t.control.transfer.to,'ALLFIR','offered again on entry');
+  requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.control.owner,'ALLFIR');
+  assert.equal(requestTransfer(t,'directional','ESA'),false,'directional transfer needs a player sector');
+  requestTransfer(t,'transfer');updateTrafficControl(s,2);assert(requestTransfer(t,'undo'));
+  updateTrafficControl(s,5);assert.equal(t.control.owner,'ALLFIR');assert.equal(t.control.transfer,null);
+  t.lon=4.1;updateTrafficControl(s);assert.equal(t.control.owner,'ESA','an untransferred aircraft leaving the sector falls back to the computer');
 });
 
 test('PEL is a three-second proposal; approval coordinates previous XFL and computer CFL',()=>{
@@ -177,7 +201,7 @@ test('heading, speed, rate and shortcuts wait; stale shortcuts and ownership cha
   const point={name:'NEW',lon:3,lat:0};issueInstruction(t,'direct',{point});assert.equal(t.navigationMode,'heading');
   advanceTraffic(s,3);assert.equal(t.navigationMode,'direct');assert.equal(t.directTo.target.name,'NEW');
   issueInstruction(t,'speed',{mode:'Mach',value:0.78});t.lon=-0.01;
-  setFlightPlan(t,[{name:'END',lon:6,lat:0}]);updateTrafficControl(s);
+  setFlightPlan(t,[{name:'END',lon:6,lat:0}]);updateTrafficControl(s);requestTransfer(t,'accept');updateTrafficControl(s);
   assert.equal(t.control.pending.speed,undefined);assert.equal(t.assignedSpeed.value,0.76);
 });
 
@@ -250,10 +274,11 @@ test('an obsolete shortcut proposal cannot be applied to a replacement flight pl
 
 test('rerouting away from an imminent exit cancels that transfer; short visits do not bounce ownership',()=>{
   const t=track(3.9),s=state(t);updateTrafficControl(s);
-  assert.equal(t.status,'accepted');updateTrafficControl(s,3);assert.equal(t.status,'intruder');
-  setFlightPlan(t,[{name:'STAY',lon:2,lat:0}]);updateTrafficControl(s);assert.equal(t.status,'accepted');
+  assert.equal(t.status,'accepted');requestTransfer(t,'transfer');updateTrafficControl(s,3);assert.equal(t.status,'intruder');
+  setFlightPlan(t,[{name:'STAY',lon:2,lat:0}]);updateTrafficControl(s);assert.equal(t.status,'intruder');
+  assert.equal(t.control.transfer.to,'ALLFIR');requestTransfer(t,'accept');updateTrafficControl(s);assert.equal(t.status,'accepted');
   const shortIndex=index();shortIndex.epww[0].polygons[0].rings=[ring(0,0.1)];
-  const fast=track(-0.01),ss=state(fast,shortIndex);updateTrafficControl(ss);assert.equal(fast.status,'accepted');
+  const fast=track(-0.01),ss=state(fast,shortIndex);updateTrafficControl(ss);requestTransfer(fast,'accept');updateTrafficControl(ss);assert.equal(fast.status,'accepted');
   fast.lon=0.01;updateTrafficControl(ss);assert.equal(fast.status,'accepted');
   updateTrafficControl(ss,1);assert.equal(fast.status,'accepted');
 });

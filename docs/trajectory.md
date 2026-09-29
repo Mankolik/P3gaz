@@ -38,11 +38,11 @@ Physical membership remains available separately. While crossing an omitted volu
 The floating [Extended Label Window](extended-label-window.md) remembers the last hovered track. Row 8 shows its current and upcoming sector designators and exit levels in route order, coloured by ownership and sequence position; repeated visits remain in order. The other rows show flight details and live Mode S values. Drag the header or use its arrow keys to move the window. Predicted crossing markers and levels still appear when the route is displayed/previewed.
 
 - ALLFIR next: **inbound**; ALLFIR later in the sequence: **pre-inbound**.
-- Within approximately 10 NM along the prediction before entry: automatically owned by ALLFIR and **accepted**, even while physically outside.
-- Within approximately 10 NM of exit: automatically owned by the next sector and **intruder** while physically inside ALLFIR. That next sector's view is **accepted**.
-- Once outside: **unconcerned**, unless another predicted ALLFIR visit makes it inbound/pre-inbound (or close enough for acceptance again).
+- Within approximately 10 NM along the prediction before entry, the computer sector **offers** a transfer: the callsign is outlined and blinks. Left-click the callsign and choose **Accept transfer** (the aircraft becomes **accepted**, even while physically outside) or **Reject transfer**. A rejected offer is repeated once the aircraft enters ALLFIR. Until accepted, an aircraft inside ALLFIR remains **intruder**.
+- Outbound transfers are manual. Left-click the callsign of an accepted aircraft and choose **Transfer → next sector** (the next retained sector in the sequence) or a **Directional transfer** to any sector controlled by a player. The callsign is outlined with a dashed line while the transfer waits; **Undo transfer** withdraws it until it is accepted. Computer sectors accept after three simulation seconds, players must accept manually. After the transfer the aircraft is **intruder** while physically inside ALLFIR, and **accepted** in the receiving sector's view.
+- Once outside: **unconcerned**, unless another predicted ALLFIR visit makes it inbound/pre-inbound (or close enough for another offer).
 
-To avoid immediate accept/send oscillation in short visits, departure transfer waits for three seconds of physical presence in ALLFIR. A transfer is retained while approaching the same exit; rerouting away from that exit cancels it. Physical crossings reconcile ownership even when there was too little distance/time for advance transfer.
+Transfers between computer sectors remain automatic. An aircraft the user never transferred is taken by the computer sector it flies into once ALLFIR is no longer in its sequence. Rerouting a transferred aircraft back into ALLFIR makes its computer owner offer it again.
 
 ## Proposals
 

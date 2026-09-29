@@ -208,3 +208,11 @@ footer.hidden{ display:none } .chip{ padding:6px 10px; background:#0b1117; borde
 .track-label .is-incoming::after{ color:#8fbfff !important; }
 .track-picker--proposal{ display:flex; flex-direction:column; gap:8px; padding:12px; }
 .sectorisation-group select{ min-width:0; max-width:100%; }
+.track-label .callsign{ cursor:pointer; border-radius:2px; }
+.track-label .callsign.transfer-in{ outline:1px solid var(--track-amber); animation:transfer-blink 1s steps(2,start) infinite; }
+.track-label .callsign.transfer-out{ outline:1px dashed currentColor; }
+@keyframes transfer-blink{ to{ outline-color:transparent; } }
+.track-picker--transfer{ gap:6px; }
+.track-picker__note{ color:var(--muted, #8a97a6); font-size:11px; letter-spacing:.3px; }
+.track-picker__option:disabled{ opacity:.45; cursor:default; background:transparent; }
+.track-picker__directional{ max-height:140px; }

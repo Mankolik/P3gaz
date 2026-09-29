@@ -4,6 +4,7 @@ import { navigationTarget } from '../radar/routes.js';
 import { buildDirectToPicker, getDirectToPreviewPoint } from '../ui/direct-to-picker.js';
 import { aircraftCeiling } from '../radar/performance.js';
 import { issueInstruction, proposedDisplayTrack } from '../radar/coordination.js';
+import { requestTransfer, transferMenu } from '../radar/transfers.js';
 import { limitSpeedInstruction, speedLimits, speedMode } from '../radar/speed-control.js';
 
 const STATUS_COLORS = {
@@ -575,6 +576,14 @@ function createLabelNode(){
     });
   },true);
 
+  callsign.addEventListener('click', evt=>{
+    if(evt.button!==0) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    if(!node.track) return;
+    openTransferMenu(node, callsign);
+  });
+
   speedToggle.addEventListener('click', evt=>{
     evt.preventDefault();
     evt.stopPropagation();
@@ -740,7 +749,14 @@ function updateLabelNode(node, track){
   }
 
   node.callsign.textContent = track.callsign || 'UNKNOWN';
-  node.callsign.title = sectorMembershipTitle(track.sectorMembership);
+  const transfer = transferMenu(track);
+  node.callsign.classList.toggle('transfer-in', transfer.kind === 'incoming');
+  node.callsign.classList.toggle('transfer-out', transfer.kind === 'outgoing');
+  node.callsign.title = [
+    transfer.kind === 'incoming' ? `Transfer from ${transfer.from}: click to accept or reject` : null,
+    transfer.kind === 'outgoing' ? `Transfer to ${transfer.to} awaiting acceptance` : null,
+    sectorMembershipTitle(track.sectorMembership),
+  ].filter(Boolean).join('\n');
   node.root.dataset.sectors = (track.sectorMembership?.sectors || []).map(sector=>sector.id).join(' ');
   node.root.dataset.sectorStatus = track.sectorMembership?.status || 'unknown';
 
@@ -895,6 +911,62 @@ export function syncTrackLabels(overlay, projected, navigationIndex){
     }
   }
   return anchors;
+}
+
+function openTransferMenu(node, anchor){
+  const track = node.track;
+  showTrackPicker(node, anchor, 'track-picker--transfer', (panel, close)=>{
+    const menu = transferMenu(track);
+    const heading = document.createElement('strong');
+    heading.textContent = track.callsign || 'UNKNOWN';
+    panel.append(heading);
+    const act = (label, action, sector=null, disabled=false)=>{
+      const option = createPickerOption(label, false);
+      option.dataset.action = action;
+      if(sector) option.dataset.sector = sector;
+      option.disabled = disabled;
+      option.addEventListener('click', evt=>{
+        evt.preventDefault();
+        evt.stopPropagation();
+        requestTransfer(track, action, sector);
+        close();
+        updateLabelNode(node, track);
+      });
+      panel.append(option);
+      return option;
+    };
+    const note = text=>{
+      const line = document.createElement('span');
+      line.className = 'track-picker__note';
+      line.textContent = text;
+      panel.append(line);
+    };
+    if(menu.kind === 'incoming'){
+      note(`${menu.directional ? 'Directional transfer' : 'Transfer'} from ${menu.from}`);
+      act('Accept transfer', 'accept');
+      act('Reject transfer', 'reject');
+    }else if(menu.kind === 'outgoing'){
+      note(`${menu.directional ? 'Directional transfer' : 'Transfer'} to ${menu.to} pending`);
+      if(menu.undo) act('Undo transfer', 'undo');
+    }else if(menu.kind === 'owned'){
+      act(menu.next ? `Transfer → ${menu.next}` : 'Transfer (no next sector)', 'transfer', null, !menu.next);
+      const title = document.createElement('span');
+      title.className = 'track-picker__note';
+      title.textContent = 'Directional transfer';
+      panel.append(title);
+      const list = document.createElement('div');
+      list.className = 'track-picker__options track-picker__directional';
+      panel.append(list);
+      if(!menu.directional.length){
+        note('No other player-controlled sectors');
+      }
+      for(const sector of menu.directional){
+        list.append(act(`→ ${sector}`, 'directional', sector));
+      }
+    }else{
+      note('Not under your control');
+    }
+  });
 }
 
 function closeActivePicker(){
