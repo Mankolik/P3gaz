@@ -921,57 +921,43 @@ export function syncTrackLabels(overlay, projected, navigationIndex){
 
 function openTransferMenu(node, anchor){
   const track = node.track;
+  const menu = transferMenu(track);
+  const items = menu.kind === 'incoming' ? [['Accept transfer','accept'],['Reject transfer','reject']]
+    : menu.kind === 'outgoing' && menu.undo ? [['Undo transfer','undo']]
+    : menu.kind === 'owned' ? [['Transfer','transfer']] : [];
+  if(!items.length) return;
   showTrackPicker(node, anchor, 'track-picker--transfer', (panel, close)=>{
-    const menu = transferMenu(track);
-    const heading = document.createElement('strong');
-    heading.textContent = track.callsign || 'UNKNOWN';
-    panel.append(heading);
-    const act = (label, action, sector=null, disabled=false)=>{
-      const option = createPickerOption(label, false);
-      option.dataset.action = action;
-      if(sector) option.dataset.sector = sector;
-      option.disabled = disabled;
-      option.addEventListener('click', evt=>{
+    const option = (label, onClick, disabled=false)=>{
+      const button = createPickerOption(label, false);
+      button.disabled = disabled;
+      button.addEventListener('click', evt=>{
         evt.preventDefault();
         evt.stopPropagation();
-        requestTransfer(track, action, sector);
-        close();
-        updateLabelNode(node, track);
+        onClick(button);
       });
-      panel.append(option);
-      return option;
+      panel.append(button);
+      return button;
     };
-    const note = text=>{
-      const line = document.createElement('span');
-      line.className = 'track-picker__note';
-      line.textContent = text;
-      panel.append(line);
+    const act = (action, sector=null)=>()=>{
+      requestTransfer(track, action, sector);
+      close();
+      updateLabelNode(node, track);
     };
-    if(menu.kind === 'incoming'){
-      note(`${menu.directional ? 'Directional transfer' : 'Transfer'} from ${menu.from}`);
-      act('Accept transfer', 'accept');
-      act('Reject transfer', 'reject');
-    }else if(menu.kind === 'outgoing'){
-      note(`${menu.directional ? 'Directional transfer' : 'Transfer'} to ${menu.to} pending`);
-      if(menu.undo) act('Undo transfer', 'undo');
-    }else if(menu.kind === 'owned'){
-      act(menu.next ? `Transfer → ${menu.next}` : 'Transfer (no next sector)', 'transfer', null, !menu.next);
-      const title = document.createElement('span');
-      title.className = 'track-picker__note';
-      title.textContent = 'Directional transfer';
-      panel.append(title);
-      const list = document.createElement('div');
-      list.className = 'track-picker__options track-picker__directional';
-      panel.append(list);
-      if(!menu.directional.length){
-        note('No other player-controlled sectors');
-      }
-      for(const sector of menu.directional){
-        list.append(act(`→ ${sector}`, 'directional', sector));
-      }
-    }else{
-      note('Not under your control');
+    for(const [label, action] of items){
+      const button = option(label, act(action), action === 'transfer' && !menu.next);
+      button.dataset.action = action;
+      if(action === 'transfer' && menu.next) button.title = `To ${menu.next}`;
     }
+    if(menu.kind !== 'owned') return;
+    // Player sectors are listed only once directional transfer is chosen.
+    const directional = option('Directional transfer', button=>{
+      button.classList.add('selected');
+      button.disabled = true;
+      for(const sector of menu.directional){
+        option(sector, act('directional', sector)).classList.add('track-picker__option--sector');
+      }
+    }, !menu.directional.length);
+    directional.dataset.action = 'directional-menu';
   });
 }
 
