@@ -39,6 +39,12 @@ Official deployment references: [Blueprint specification](https://render.com/doc
 
 ## Start a session
 
+Solo mode displays the current real UTC time. Every created multiplayer room,
+including a room with only one player, starts its clock at 12:00:00Z. The clock
+follows server simulation time: pausing freezes it, 2×/4× speed advances it at
+that rate, and joining players see the existing room time. Leaving a room
+restores real UTC. The display wraps at midnight.
+
 Open **Multiplayer**, enter unique initials (1–4 letters or digits), and create a room. Copy the invitation link for other players. They enter initials and join; no accounts are required. Treat the invitation as access to the room.
 
 Everyone, including the host, initially observes. Choose a free sector from **Your sector**. Leaving a sector releases it to computer control. The host can use **Sectorisation** to split or merge sectors and explicitly assign each player to a resulting sector or to Observer. Two players cannot occupy the same sector.

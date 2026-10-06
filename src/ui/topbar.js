@@ -6,6 +6,7 @@ import { initDefaultLayers } from '../map/layers.js';
 import { mountSpawnButton } from './spawn-button.js';
 import { mountSectorisationEditor } from './panels/sectorisation-panel.js';
 import { mountMultiplayerPanel } from './panels/multiplayer-panel.js';
+import { clockText } from './clock.js';
 
 export function mountTopbar(root, state, bus){
   root.innerHTML = '';
@@ -79,7 +80,9 @@ export function mountTopbar(root, state, bus){
 
   // UTC clock
   const gClk=wrap('UTC'); const info=el('div','info'); const clk=el('span','value'); info.append(clk); gClk.append(info); root.append(gClk);
-  const tick=()=>{ const d=new Date(); clk.textContent=d.toISOString().slice(11,19)+'Z'; }; tick(); setInterval(tick,1000);
+  clk.setAttribute('aria-label','UTC clock');
+  const tick=()=>{clk.textContent=clockText(state.multiplayer);};
+  tick();setInterval(tick,1000);bus.on('multiplayer:changed',tick);
 
   // MENU toggle
   const gMenu=wrap('MENU'); gMenu.append(toggleText(state.ui.top.menuOn, on=>{ state.ui.top.menuOn=on; document.getElementById('bottombar').classList.toggle('hidden', !on); })); root.append(gMenu);
