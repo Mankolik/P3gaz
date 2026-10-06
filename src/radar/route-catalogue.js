@@ -125,18 +125,19 @@ export function compileRouteCatalogue(groups, resolver, boundary, metricsOptions
               throw new Error(`Cannot expand EPWW section ${from.name} ${connector} ${to.name}.`);
             }
           } else {
-            // Only explicitly filed SID/STAR connectors may expand procedures.
-            const explicit=variant.route.toUpperCase().split(/\s+/).includes(connector);
-            const procedure=explicit && (connector==='SID' && i===1
-              ? findTerminalProcedure(group.departure,'SID',to.name)
-              : connector==='STAR' && i===rawPoints.length-1
-                ? findTerminalProcedure(group.destination,'STAR',from.name) : null);
+            // Airport-to-fix DCT notation is also used for terminal connections
+            // in the catalogue. Match the airport and exact connection; never
+            // select by proximity or expand an interior en-route DCT leg.
+            const type=i===1 && ['SID','DCT'].includes(connector) ? 'SID'
+              : i===rawPoints.length-1 && ['STAR','DCT'].includes(connector) ? 'STAR' : null;
+            const procedure=type && findTerminalProcedure(type==='SID' ? group.departure : group.destination,
+              type,type==='SID' ? to.name : from.name);
             if(procedure){
               const terminal=procedureRoutePoints(procedure);
               // Replace the shared connecting fix; keep its restriction exactly once.
-              if(connector==='STAR' && points.at(-1)?.name===from.name)points.pop();
+              if(type==='STAR' && points.at(-1)?.name===from.name)points.pop();
               terminal.forEach(append);
-              if(connector==='STAR')append(to);
+              if(type==='STAR')append(to);
             }else append(to);
           }
         }

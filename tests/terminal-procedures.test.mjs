@@ -17,6 +17,9 @@ import { calculateAirSpeeds,convertIasToTas } from '../src/utils/speed.js';
 import { wireTrack,createStateReceiver } from '../src/multiplayer/protocol.js';
 import { SnapshotStream } from '../server/snapshots.js';
 import { advanceTraffic } from '../src/radar/traffic-control.js';
+import { tokenizeRoute } from '../src/radar/route-catalogue.js';
+import { createAircraftSpawner } from '../src/radar/spawner.js';
+import { requestTransfer,nextTransferSector } from '../src/radar/transfers.js';
 
 const data=await loadSimulationData();
 const point=(name,lon,altitude={},speed={},type='STAR')=>({name,lon,lat:0,
@@ -30,17 +33,21 @@ const state=t=>({air:{tracks:[t],controlledSector:'ALLFIR'},map:{}});
 const managed=t=>{t.arrivalManaged=true;t.arrivalAirport=plan.at(-1);return t;};
 const speed=t=>effectiveProcedureSpeed(t,performanceSchedule(t)).value;
 
-test('all 205 filed domestic procedures resolve; DCT and foreign connectors remain unexpanded',()=>{
+test('all 211 matching domestic terminal procedures resolve, including terminal DCT notation',()=>{
   assert.equal(TERMINAL_PROCEDURES.length,155);
   assert.equal(data.catalogue.validVariants,251);
   let count=0;
   for(const group of data.catalogue.groups)for(const v of group.variants){
-    const tokens=v.route.split(/\s+/);
+    const tokens=tokenizeRoute(v.route,group.departure,group.destination);
     for(const type of ['SID','STAR']){
       const airport=type==='SID'?group.departure:group.destination;
-      const annotated=tokens.includes(type) && airport.startsWith('EP');
+      const connection=type==='SID' ? tokens.fixes[1] : tokens.fixes.at(-2);
+      const expected=findTerminalProcedure(airport,type,connection);
       const fixes=v.waypoints.filter(p=>p.procedure?.type===type);
-      if(annotated){assert(fixes.length,`${group.departure}-${group.destination} ${type}`);count++;}
+      if(expected){
+        assert(fixes.length,`${group.departure}-${group.destination} ${type}`);count++;
+        assert(fixes.every(p=>p.procedure.name===expected.name));
+      }
       else assert.equal(fixes.length,0,`${airport} ${type}`);
       if(fixes.length){
         const first=fixes[0],last=fixes.at(-1);
@@ -48,13 +55,53 @@ test('all 205 filed domestic procedures resolve; DCT and foreign connectors rema
       }
     }
   }
-  assert.equal(count,205);
+  assert.equal(count,211);
   assert.equal(findTerminalProcedure('EPMO','STAR','GOGUS').name,'GOGUS 1Y');
   assert.equal(findTerminalProcedure('EPLB','SID','VADOL').name,'VADOL 1J');
   assert.equal(findTerminalProcedure('EPRZ','STAR','LUXAR').name,'LUXAR 3D');
   for(const p of TERMINAL_PROCEDURES)for(const fix of p.points){
     assert(Number.isFinite(fix.lon)&&Number.isFinite(fix.lat));
     assert(data.navigationIndex.has(fix.name),fix.name);
+  }
+});
+
+test('RYR33YN uses EPMO SORIX STAR from the filed connection through snapshots',()=>{
+  const group=data.catalogue.groups.find(g=>g.callsigns.includes('RYR33YN'));
+  const room=new Room('SORIX',data);
+  room.spawner=createAircraftSpawner({...data.catalogue,groups:[{...group,callsigns:['RYR33YN']}]},{random:()=>0});
+  const host=room.add('AA');room.command(host.id,{type:'spawn'});
+  const t=room.state.air.tracks[0],star=wireTrack(t).flightPlan.waypoints.filter(p=>p.procedure?.type==='STAR');
+  assert.equal(t.callsign,'RYR33YN');assert.equal(star[0].name,'SORIX');
+  assert(star.every(p=>p.procedure.airport==='EPMO' && p.procedure.name==='SORIX 3Y'));
+  assert.equal(t.flightPlan.waypoints.filter(p=>p.name==='SORIX').length,1);
+});
+
+test('every airport departure starts at FL030 in a solo multiplayer room, including both EPLL routes',()=>{
+  let checked=0,epll=0;
+  const room=new Room('SPAWN',data),host=room.add('AA');room.command(host.id,{type:'claim',sectorId:'acc-1'});
+  for(const group of data.catalogue.groups)for(const variant of group.variants){
+    if(!variant.groundStart)continue;
+    room.state.air.tracks=[];
+    room.spawner=createAircraftSpawner({...data.catalogue,groups:[{...group,variants:[variant]}]},{random:()=>.5});
+    room.command(host.id,{type:'spawn'});
+    const t=room.state.air.tracks[0],wire=wireTrack(t);
+    assert.equal(t.spawnPoint,group.departure);assert.equal(t.actualFlightLevel,30,variant.route);
+    assert.equal(wire.actualFlightLevel,30);assert.equal(t.onGround,false);
+    assert.equal(calculateAirSpeeds(t.groundSpeed,3000,t.heading).ias,180);
+    checked++;if(group.departure==='EPLL')epll++;
+  }
+  assert(checked>50);assert.equal(epll,2);
+});
+
+test('outbound cleanup preserves a human owner and pending human acceptance until manual handoff',()=>{
+  for(const shared of [false,true])for(const offered of [false,true]){
+    const t=track();t.hasBeenInsideFir=true;
+    t.control={owner:offered?'EDU':'ALLFIR',transfer:offered?{from:'EDU',to:'ALLFIR'}:null};
+    const s=state(t);Object.assign(s.air,{shared,humanSectors:new Set(['ALLFIR']),
+      firBoundary:{contains:()=>false,distanceToEdge:()=>100}});
+    removeFinishedTraffic(s,60);assert.equal(s.air.tracks.length,1);
+    t.control.owner='ESA';t.control.transfer=null;
+    removeFinishedTraffic(s,1);assert.equal(s.air.tracks.length,0);
   }
 });
 
@@ -177,7 +224,7 @@ test('real multiplayer STAR shortcut preserves restrictions across wire snapshot
   assert.deepEqual(restored.directTo.target.procedure,t.directTo.target.procedure);
   const stream=new SnapshotStream(),a=createStateReceiver(),b=createStateReceiver();
   stream.capture(room);const full=stream.capture(room,true);a.accept(full);b.accept(full);
-  t.arrivalManaged=true;t.actualFlightLevel=30;
+  t.control.owner='APWA';t.control.transfer=null;t.arrivalManaged=true;t.actualFlightLevel=30;
   removeFinishedTraffic(room.state,1);
   const delta=stream.capture(room);assert.deepEqual(delta.removed,['arrival']);
   a.accept(delta);b.accept(delta);assert.equal(a.tracks.size,0);assert.equal(b.tracks.size,0);
@@ -199,6 +246,8 @@ test('real EPWA arrival transfers to approach and is removed in both offline and
   let armedShared=false,armedOffline=false;
   for(let elapsed=0;elapsed<3600 && (room.state.air.tracks.length || local.air.tracks.length);elapsed+=5){
     room.step(5);advanceTraffic(local,5);
+    if(offline.control?.owner==='ALLFIR' && !offline.control.transfer && nextTransferSector(offline)==='APWA')
+      requestTransfer(offline,'transfer');
     armedShared ||= !!shared.arrivalManaged;armedOffline ||= !!offline.arrivalManaged;
   }
   assert(armedShared && armedOffline);

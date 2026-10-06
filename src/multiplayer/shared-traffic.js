@@ -28,14 +28,14 @@ export function updateSharedTraffic(state,seconds=0){
       const previous=c.activeSector;
       c.activeSector=active;c.visit++;c.enteredAt=c.time;c.retainPhysicalVisit=true;
       // Only computer sectors hand over automatically, and never to a player.
-      if(!human(c.owner) && c.owner===previous && !human(active)){c.owner=active;c.sentTo=null;}
+      if(!human(c.owner) && !c.transfer && c.owner===previous && !human(active)){c.owner=active;c.sentTo=null;}
     }
     const saved=cache.get(t),travelled=distanceNm(saved,t),sequence=t.trajectory.sequence,next=sequence[1];
     const planned=sequence.some(v=>v.sector===c.owner);
     if(c.reconfiguredAt==null || c.time-c.reconfiguredAt>=3){
-      if(human(c.owner)){
-        // A player keeps an untransferred aircraft until it has left for computer airspace.
-        if(!human(active) && !planned && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;}
+      if(human(c.owner) || c.transfer){
+        // Players retain control across every boundary. Pending offers also
+        // retain their sender until accepted, rejected or withdrawn.
       }else if(human(active)){
         if(!planned && !transferRejected(t,active))offerTransfer(t,active,{human});
       }else{

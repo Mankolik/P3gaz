@@ -63,9 +63,9 @@ export function updateTrafficControl(state,seconds=0){
       const previousActive=c.activeSector;
       c.activeSector=active;c.visit++;c.retainPhysicalVisit=true;
       if(active===controlled){c.hasEntered=true;c.enteredAt=c.time;}
-      // Computer sectors hand over among themselves, and take an aircraft the
-      // user never transferred once it has left; the user accepts manually.
-      else if(c.owner===controlled ? !track.trajectory.sequence.some(v=>v.sector===controlled) : c.owner===previousActive){
+      // Crossing a boundary cannot take ownership from a player or replace
+      // the sender of an offer that is still waiting for acceptance.
+      else if(c.owner!==controlled && !c.transfer && c.owner===previousActive){
         c.owner=active;c.sentTo=null;
       }
       track.labelRevision=(track.labelRevision || 0)+1;
@@ -93,10 +93,8 @@ export function updateTrafficControl(state,seconds=0){
     if(c.reconfiguredAt!=null && c.time-c.reconfiguredAt<3){
       // Reconfiguration transfers by current position, without immediately
       // undoing that decision through the normal early-transfer window.
-    }else if(c.owner===controlled){
-      // Without a manual transfer, the user keeps the aircraft until it has
-      // left for computer airspace for good.
-      if(!human(active) && !plannedOwner && active!=='UNKNOWN'){c.owner=active;c.sentTo=null;c.transfer=null;}
+    }else if(c.owner===controlled || c.transfer){
+      // Human ownership and pending offers persist until an explicit action.
     }else if(active===controlled){
       if(!plannedOwner && !transferRejected(track,controlled))offerTransfer(track,controlled,{human});
     }else{

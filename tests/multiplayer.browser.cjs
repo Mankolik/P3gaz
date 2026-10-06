@@ -38,6 +38,7 @@ const {chromium}=require('playwright');
     await editor.getByLabel('Sector for AA').selectOption({label:'ALLFIR L'});await editor.getByLabel('Sector for BB').selectOption({label:'ALLFIR H'});
     await editor.getByRole('button',{name:'Apply configuration'}).click();
     const room=[...app.rooms.values()][0],pa=[...room.players.values()].find(p=>p.initials==='AA'),pb=[...room.players.values()].find(p=>p.initials==='BB');
+    const advance=seconds=>{const paused=room.paused;room.paused=false;try{room.step(seconds);}finally{room.paused=paused;}};
     assert.equal(room.sector(pa),'ALLFIR L');assert.equal(room.sector(pb),'ALLFIR H');
     const t=createTrack({id:'mp-test',callsign:'LOT123',aircraftType:'A320',departure:'EPWA',destination:'ESSA',lon:20,lat:52,heading:45,groundSpeed:450,actualFlightLevel:330,
       clearedFlightLevel:330,expectedCruiseLevel:380,exitFlightLevel:null,flightPlan:{waypoints:[{name:'MID',lon:22,lat:53},{name:'END',lon:24,lat:54}]}});
@@ -69,6 +70,32 @@ const {chromium}=require('playwright');
     await lb.locator('.assigned-heading').click();await b.getByRole('button',{name:'Change proposal',exact:true}).click();await b.locator('.track-picker input').fill('180');await b.keyboard.press('Enter');
     await b.waitForFunction(()=>document.querySelector('.assigned-heading.is-proposed')?.textContent==='180°');
     await lb.locator('.assigned-heading').click();await b.getByRole('button',{name:'Withdraw',exact:true}).click();await b.waitForFunction(()=>!document.querySelector('.is-proposed'));assert.equal(t.assignedHeading,null);
+    // Transfer is a substate: the sender remains accepted, with a red target
+    // above the callsign; the receiver has a blue sender and accepts manually.
+    await la.locator('.callsign').click();await a.getByRole('button',{name:'Transfer',exact:true}).click();
+    await la.locator('.transfer-sector[data-direction="out"]').waitFor();
+    await lb.locator('.transfer-sector[data-direction="in"]').waitFor();
+    assert.equal(await la.locator('.transfer-sector').textContent(),'ALLFIR H');
+    assert.equal(await lb.locator('.transfer-sector').textContent(),'ALLFIR L');
+    assert.equal(await la.locator('.transfer-sector').evaluate(e=>getComputedStyle(e).color),'rgb(255, 102, 89)');
+    assert.equal(await lb.locator('.transfer-sector').evaluate(e=>getComputedStyle(e).color),'rgb(34, 119, 255)');
+    for(const label of [la,lb]){
+      const above=await label.locator('.transfer-sector').boundingBox(),call=await label.locator('.callsign').boundingBox();
+      assert(above.y+above.height<=call.y+1,'transfer sector appears above callsign');
+    }
+    assert.match(await la.getAttribute('class'),/status-accepted/);
+    advance(30);assert.equal(t.control.owner,'ALLFIR L');
+    await lb.locator('.callsign').click();await b.getByRole('button',{name:'Accept transfer',exact:true}).click();
+    await a.waitForFunction(()=>document.querySelector('.track-label')?.classList.contains('status-intruder'));
+    await b.waitForFunction(()=>document.querySelector('.track-label')?.classList.contains('status-accepted'));
+    assert.equal(t.control.owner,'ALLFIR H');
+    // Return it directionally, exercising the same acceptance UI both ways.
+    await lb.locator('.callsign').click();await b.getByRole('button',{name:'Directional transfer',exact:true}).click();
+    await b.getByRole('button',{name:'ALLFIR L',exact:true}).click();
+    await la.locator('.transfer-sector[data-direction="in"]').waitFor();
+    await la.locator('.callsign').click();await a.getByRole('button',{name:'Accept transfer',exact:true}).click();
+    await a.waitForFunction(()=>document.querySelector('.track-label')?.classList.contains('status-accepted'));
+    assert.equal(t.control.owner,'ALLFIR L');
     // Sector changes cannot steal occupied sectors; observers have no dark footprint.
     await open(b);assert.equal(await dialog(b).getByLabel('Your sector').locator('option').filter({hasText:'ALLFIR L'}).isDisabled(),true);
     await dialog(b).getByLabel('Your sector').selectOption('');await close(b);
@@ -80,8 +107,17 @@ const {chromium}=require('playwright');
     await b.waitForFunction(()=>Number(document.querySelector('.level-afl .level-segment__value')?.textContent)>330,{},{timeout:15000});
     await open(a);await dialog(a).getByRole('button',{name:'Pause',exact:true}).click();await close(a);
     assert(t.actualFlightLevel>330);assert.equal(app.rooms.size,1);
+    // With BB observing, only AA controls a sector: computer acceptance must
+    // still show the outgoing substate for its full three-second delay.
+    await la.locator('.callsign').click();await a.getByRole('button',{name:'Transfer',exact:true}).click();
+    await la.locator('.transfer-sector[data-direction="out"]').waitFor();
+    assert.equal(await la.locator('.transfer-sector').textContent(),'ALLFIR H');
+    advance(2.9);assert.equal(t.control.owner,'ALLFIR L');
+    advance(.1);assert.equal(t.control.owner,'ALLFIR H');
+    await a.waitForFunction(()=>document.querySelector('.transfer-sector')?.style.display==='none');
+    assert.match(await la.getAttribute('class'),/status-intruder/);
     await open(a);await dialog(a).getByRole('button',{name:'Leave room',exact:true}).click();
     await b.waitForFunction(()=>document.querySelector('.multiplayer-message')?.textContent.includes('host left'));
-    assert.equal(app.rooms.size,0);assert.deepEqual(errors,[]);console.log('PASS: real two-player rooms, sector views, host assignment, human proposal colours and actions, DCT preview, withdrawal, movement updates, and host disconnect; split hosting='+!!frontend+'.');
+    assert.equal(app.rooms.size,0);assert.deepEqual(errors,[]);console.log('PASS: two-player and solo-controller transfers, red/blue sector labels, manual acceptance, directional return, computer delay, proposals, movement and disconnect; split hosting='+!!frontend+'.');
   }finally{await browser?.close();await app.close();if(frontend)await new Promise(resolve=>frontend.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

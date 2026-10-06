@@ -2,13 +2,14 @@
 
 The supplied `SID_STAR_extraction.zip` contains 162 procedures. The game imports
 155 fixed choices across 15 Polish airports, covering all 205 explicitly filed
-domestic SID/STAR connectors in the current 251 route variants. The same route
+domestic SID/STAR connectors plus six matching terminal DCT connections in the
+current 251 route variants. The same route
 compiler and movement/guidance code run offline and on the multiplayer server.
 
 ## Route selection
 
-Only an explicit SID or STAR marker expands a procedure, and only when its
-airport and connecting fix match. DCT legs stay DCT. Foreign airports stay on
+Terminal SID, STAR and DCT connections expand a procedure only when its
+airport and connecting fix match exactly. Interior en-route DCT legs stay DCT. Foreign airports stay on
 the existing foreign-route rules; EDDB, LKPR and EYVI still start airborne at
 their airport, now at FL030. EPZG has STAR data only. Unmatched future markers
 retain the original direct connection; no procedure is invented.
@@ -82,7 +83,9 @@ progressive arrival behavior once their destination approach takes ownership.
 All airport departures start at FL030 / IAS180 instead of FL010. They retain
 their existing type, ECL, climb coordination and gradual acceleration behavior.
 
-An aircraft is removed once it has been inside EPWW, is outside again, and its
+An aircraft under human control, or with an offer awaiting a human's acceptance,
+is retained until the transfer is resolved; cleanup cannot bypass manual control.
+Other aircraft are removed once they have been inside EPWW, are outside again, and their
 nearest lateral EPWW boundary is at least 60 NM away. This is distance from the
 boundary, not accumulated distance flown outside. Incoming aircraft are not
 removed before their first entry; re-entry prevents outbound deletion while
@@ -102,11 +105,13 @@ labels and procedure notes. Its current size is 185,731 bytes / 13,698 bytes
 gzip; it is served with the other static assets, with no new fetch per tick.
 Route metadata is transmitted on creation and changes via the existing protocol.
 
-Validation: 187 automated tests passed, including every catalogue variant under
-five sectorisations, all 155 selected procedures with 898 B738 restriction-fix
-crossings, exact/window constraints, shortcuts, manual overrides, progressive
-arrival, a real EPWA arrival from handoff through removal in both simulation
-modes, boundary removal and snapshot deletion/reconnect behavior. The existing
-WebSocket integration test passed with ten clients and 100 aircraft. The static
-build passed. Cloud Browser blocked the local preview URL, so this change has
-not received a fresh browser UI check or a production deployment check.
+Validation: 197 automated tests passed, including every catalogue variant under
+five sectorisations, all 155 selected procedures, exact/window constraints,
+shortcuts, manual overrides, progressive arrival, manual ownership across
+boundaries, RYR33YN's SORIX STAR metadata, and every airport departure at FL030
+in a solo multiplayer room (including both EPLL routes). The WebSocket test
+passed with ten clients and 100 aircraft. The static build and real Chrome
+multiplayer checks passed, including separate frontend/backend hosting, red/blue
+transfer labels, manual acceptance, directional transfers and computer acceptance.
+These checks run locally; frontend and backend must both be deployed to update
+production multiplayer sessions.
