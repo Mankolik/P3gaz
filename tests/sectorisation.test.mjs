@@ -145,7 +145,10 @@ test('a lower user XFL stops the virtual climb before a computer High sector res
   assert(!t.trajectory.sequence.some(v=>v.sector==='ALLFIR H'));
   t.exitFlightLevel=370;updateTrafficControl(s);
   const visit=t.trajectory.sequence.find(v=>v.sector==='ALLFIR H');assert(visit);assert(Math.abs(visit.entry.level-365)<1e-5);assert.equal(visit.targetLevel,380);
-  t.actualFlightLevel=366;updateTrafficControl(s);assert.equal(t.clearedFlightLevel,380);
+  t.actualFlightLevel=366;updateTrafficControl(s);
+  assert.equal(t.control.owner,'ALLFIR L');assert.equal(t.clearedFlightLevel,200,'crossing the roof cannot issue a computer clearance');
+  assert(requestTransfer(t,'transfer'));updateTrafficControl(s,3);
+  updateTrafficControl(s);assert.equal(t.clearedFlightLevel,380);
 });
 
 test('shading uses the union of both layers, including High-only lateral areas',()=>{

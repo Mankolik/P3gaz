@@ -132,7 +132,7 @@ test('rerouting while inside an omitted visit promotes it if there is no longer 
   updateTrafficControl(s);t.lon=3.86;updateTrafficControl(s,4);
   assert.equal(t.control.activeSector,'ALLFIR');
   setFlightPlan(t,[{name:'STAY',lon:3.87,lat:0}]);updateTrafficControl(s);
-  assert.equal(t.control.activeSector,'APWA');assert.equal(t.control.owner,'APWA');
+  assert.equal(t.control.activeSector,'APWA');assert.equal(t.control.owner,'ALLFIR');
   assert.deepEqual(sectors(t.trajectory),['APWA']);
 });
 
@@ -173,7 +173,23 @@ test('the user can reject an inbound offer and undo an outbound transfer before 
   assert.equal(requestTransfer(t,'directional','ESA'),false,'directional transfer needs a player sector');
   requestTransfer(t,'transfer');updateTrafficControl(s,2);assert(requestTransfer(t,'undo'));
   updateTrafficControl(s,5);assert.equal(t.control.owner,'ALLFIR');assert.equal(t.control.transfer,null);
-  t.lon=4.1;updateTrafficControl(s);assert.equal(t.control.owner,'ESA','an untransferred aircraft leaving the sector falls back to the computer');
+  t.lon=4.1;updateTrafficControl(s,60);assert.equal(t.control.owner,'ALLFIR','leaving the sector must not take control away');
+  assert.equal(t.status,'accepted');assert.equal(nextTransferSector(t),'ESA');
+  assert(requestTransfer(t,'transfer'),'late transfers remain available');
+  updateTrafficControl(s,2.9);assert.equal(t.control.owner,'ALLFIR');
+  updateTrafficControl(s,.1);assert.equal(t.control.owner,'ESA');
+});
+
+test('offline incoming offers retain the sending FIR until accepted, even after crossing both boundaries',()=>{
+  const t=track(-.1),s=state(t);updateTrafficControl(s);
+  assert.equal(t.control.transfer.from,'EDU');
+  for(const lon of [.1,4.1]){
+    t.lon=lon;updateTrafficControl(s,60);
+    assert.equal(t.control.owner,'EDU');assert.equal(t.control.transfer.to,'ALLFIR');
+    assert.equal(t.control.transfer.from,'EDU');assert.equal(t.status,'inbound');
+  }
+  assert(requestTransfer(t,'accept'));updateTrafficControl(s,60);
+  assert.equal(t.control.owner,'ALLFIR');assert.equal(t.status,'accepted');
 });
 
 test('PEL is a three-second proposal; approval coordinates previous XFL and computer CFL',()=>{

@@ -109,6 +109,42 @@ test('computer sectors offer aircraft to players and accept player transfers aft
   u.room.step(30);assert.equal(u.t.control.owner,'T L+H','players accept computer offers manually');
   transfer(u.room,u.b,u.t,'accept');assert.equal(u.t.control.owner,'C L+H');
 });
+
+test('solo room retains ownership outside the sector and supports early, late and boundary-crossing transfers',()=>{
+  for(const timing of ['early','late','crossing']){
+    const {room,a,b,t}=setup();room.remove(b.id);
+    if(timing==='late'){t.lon=2.1;room.refresh();room.step(60);}
+    assert.equal(t.control.owner,'T L+H');assert.equal(t.control.transfer,undefined);
+    transfer(room,a,t,'transfer');
+    assert.equal(t.control.transfer.to,'C L+H');
+    if(timing==='crossing'){t.lon=2.1;room.refresh();}
+    room.step(2.9);
+    assert.equal(t.control.owner,'T L+H');assert.equal(t.control.transfer.from,'T L+H');
+    assert.equal(trackForPlayer(t,'T L+H',a.id).status,'accepted');
+    room.step(.1);assert.equal(t.control.owner,'C L+H');assert.equal(t.control.transfer,null);
+  }
+});
+
+test('a foreign FIR offer survives entry and exit until the human accepts',()=>{
+  const {room,a,b,t}=setup();room.remove(b.id);
+  t.lon=-.1;t.control=null;room.refresh();room.step(4);
+  assert.equal(t.control.transfer.from,'EDU');assert.equal(t.control.transfer.to,'T L+H');
+  for(const lon of [.1,2.1,4.1]){
+    t.lon=lon;room.refresh();room.step(30);
+    assert.equal(t.control.owner,'EDU');assert.equal(t.control.transfer.from,'EDU');
+    assert.equal(trackForPlayer(t,'T L+H',a.id).status,'inbound');
+  }
+  transfer(room,a,t,'accept');room.step(30);
+  assert.equal(t.control.owner,'T L+H');assert.equal(trackForPlayer(t,'T L+H',a.id).status,'accepted');
+});
+
+test('claiming a computer receiver stops automatic acceptance of its pending transfer',()=>{
+  const {room,a,b,t,right}=setup();room.command(b.id,{type:'claim',sectorId:null});
+  transfer(room,a,t,'transfer');room.step(2);
+  room.command(b.id,{type:'claim',sectorId:right});room.step(30);
+  assert.equal(t.control.owner,'T L+H');assert.equal(t.control.transfer.due,null);
+  transfer(room,b,t,'accept');assert.equal(t.control.owner,'C L+H');
+});
 test('host reconfiguration assigns all affected players atomically and preserves clearances for retained controller',()=>{
   const {room,a,b,t,left,right}=setup();instruction(room,a,t,'exitFlightLevel',360);
   const config=cloneSectorisation(room.config),newId=addSectorGroup(config);moveSectorMembers(config,['T:LOW'],newId);
