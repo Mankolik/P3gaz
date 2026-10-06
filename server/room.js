@@ -210,5 +210,6 @@ export class Room {
     this.proposals=[];this.config=next;this.revision++;this.state.air.sectorisation=next;this.state.air.airspaceIndex=index;this.refresh();
   }
   metadata(){return {code:this.code,hostId:this.hostId,config:this.config,revision:this.revision,paused:this.paused,speed:this.speed,
+    time:Math.floor(this.time),
     players:[...this.players.values()].map(({id,initials,sectorId})=>({id,initials,sectorId})),proposals:this.proposals};}
 }
